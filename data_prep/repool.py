@@ -64,7 +64,7 @@ def main(train_path, val_path, test_path, out_path='dentex_merged_1005.json'):
 
 if __name__ == "__main__":
     main(
-        train_path=r"C:\\Users\\mosqu\\Desktop\\DentalCalib Net\\DentalCalib-Net\\json_files\\train_quadrant_enumeration_disease.json",
-        val_path=r"C:\\Users\\mosqu\\Desktop\\DentalCalib Net\\DentalCalib-Net\\json_files\\validation_triple.json",
-        test_path=r"C:\\Users\\mosqu\\Desktop\\DentalCalib Net\\DentalCalib-Net\\json_files\\test_quadrant_enumeration_disease.json",
+        train_path="C:/Users/mosqu/Desktop/DentalCalibNet/DentalCalib-Net/json_files/train_quadrant_enumeration_disease.json",
+        val_path="C:/Users/mosqu/Desktop/DentalCalibNet/DentalCalib-Net/json_files/validation_triple.json",
+        test_path="C:/Users/mosqu/Desktop/DentalCalibNet/DentalCalib-Net/json_files/test_quadrant_enumeration_disease.json",
     )
