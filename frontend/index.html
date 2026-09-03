@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DentCalib — Confidence Calibration Benchmark</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-name">DentCalib</div>
+      <div class="brand-sub">Confidence calibration benchmark for impacted tooth detection</div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-item active" data-page="auditor">Live OPG Auditor</button>
+      <button class="nav-item" data-page="explorer">Benchmark Explorer</button>
+      <button class="nav-item" data-page="reliability">Reliability Viewer</button>
+      <button class="nav-item" data-page="degradation">OOD Degradation Curves</button>
+      <button class="nav-item" data-page="pipeline">DentalCalib-Net Pipeline</button>
+    </nav>
+
+    <div class="dataset-context">
+      <div class="ctx-label">Dataset context</div>
+      <div class="ctx-tags">
+        <span class="tag">DENTEX 2023</span>
+        <span class="tag">UFBA-UESC</span>
+        <span class="tag">9 OOD-C</span>
+        <span class="tag">4 Dental-OOD</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <div class="demo-banner">
+      <strong>Simulated data.</strong> No trained model is connected. Every chart, table, and
+      inference result on this page is generated with <code>Math.random()</code> in
+      <code>script.js</code> — none of it comes from an actual YOLOv8 / RT-DETR run or from the
+      thesis results (Chapters 4's result tables are not yet filled in). Do not present these
+      numbers as findings.
+    </div>
+
+    <!-- PAGE 1: LIVE OPG AUDITOR -->
+    <section class="page active" id="page-auditor">
+      <header class="page-head">
+        <h1>Live OPG Auditor</h1>
+        <p>Upload a panoramic dental radiograph and run live calibration inference on both models.</p>
+      </header>
+
+      <div class="card upload-card" id="dropzone">
+        <input type="file" id="fileInput" accept="image/*" hidden>
+        <div class="upload-icon">+</div>
+        <div class="upload-title">Upload a panoramic dental radiograph</div>
+        <div class="upload-sub">JPG or PNG · OPG from DENTEX</div>
+      </div>
+      <div class="sim-note">
+        <span class="sim-chip">SIMULATED</span>
+        Uploading an image only previews it. "Run inference" below generates random ECE/MCE/D-ECE
+        values — it does not run YOLOv8 or RT-DETR on your image.
+      </div>
+
+      <div class="controls-row">
+        <label class="field">
+          <span>OOD condition</span>
+          <select id="oodCondition">
+            <option>None (clean)</option>
+            <option>Gaussian noise</option>
+            <option>Motion blur</option>
+            <option>JPEG compression</option>
+            <option>Pixel exposure</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Severity (1–5)</span>
+          <input type="range" min="1" max="5" value="3" id="severity">
+        </label>
+        <label class="field">
+          <span>Recalibration</span>
+          <select id="recalMethod">
+            <option>None (raw)</option>
+            <option>Temperature scaling</option>
+            <option>DentalCalib-Net</option>
+          </select>
+        </label>
+        <button class="btn-primary" id="runInference">Run inference (simulated)</button>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">YOLOv8 — One-stage anchor-free</div>
+          <div class="opg-preview" id="preview-yolo">
+            <img id="img-yolo" alt="" hidden>
+            <span class="placeholder">OPG image</span>
+          </div>
+          <div class="metric-row">
+            <span>ECE <b id="yolo-ece">0.142</b></span>
+            <span>MCE <b id="yolo-mce">0.261</b></span>
+            <span>D-ECE <b id="yolo-dece">0.189</b></span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">RT-DETR — Transformer, IoU-aware</div>
+          <div class="opg-preview" id="preview-rtdetr">
+            <img id="img-rtdetr" alt="" hidden>
+            <span class="placeholder">OPG image</span>
+          </div>
+          <div class="metric-row">
+            <span>ECE <b id="rtdetr-ece">0.097</b></span>
+            <span>MCE <b id="rtdetr-mce">0.183</b></span>
+            <span>D-ECE <b id="rtdetr-dece">0.134</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-3 stat-strip">
+        <div class="card stat-card">
+          <div class="stat-label">Expected Calibration Error (ECE)</div>
+          <div class="stat-pair"><span>YOLOv8 <b id="s1-yolo">0.142</b></span><span>RT-DETR <b id="s1-rt">0.097</b></span></div>
+          <div class="stat-delta good">RT-DETR −0.045 better</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">Max Calibration Error (MCE)</div>
+          <div class="stat-pair"><span>YOLOv8 <b id="s2-yolo">0.261</b></span><span>RT-DETR <b id="s2-rt">0.183</b></span></div>
+          <div class="stat-delta good">RT-DETR −0.078 better</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">Detection Calib. Error (D-ECE)</div>
+          <div class="stat-pair"><span>YOLOv8 <b id="s3-yolo">0.189</b></span><span>RT-DETR <b id="s3-rt">0.134</b></span></div>
+          <div class="stat-delta good">RT-DETR −0.055 better</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">YOLOv8 — Reliability diagram</div>
+          <canvas id="chart-rel-yolo" height="160"></canvas>
+          <div class="chart-note bad">Overconfident at high-confidence bins</div>
+        </div>
+        <div class="card">
+          <div class="card-title">RT-DETR — Reliability diagram</div>
+          <canvas id="chart-rel-rtdetr" height="160"></canvas>
+          <div class="chart-note good">Closer alignment with diagonal</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 2: BENCHMARK EXPLORER -->
+    <section class="page" id="page-explorer">
+      <header class="page-head">
+        <h1>Benchmark Explorer</h1>
+        <p>Filter and explore all precomputed calibration results across models and OOD conditions.</p>
+      </header>
+
+      <div class="card filter-bar">
+        <label class="field"><span>Model</span>
+          <select id="f-model"><option>All models</option><option>YOLOv8</option><option>RT-DETR</option></select>
+        </label>
+        <label class="field"><span>OOD source</span>
+          <select id="f-source"><option>All sources</option><option>DENTEX-C</option><option>Dental-OOD</option></select>
+        </label>
+        <label class="field"><span>Corruption type</span>
+          <select id="f-corruption"><option>All types</option><option>Gaussian noise</option><option>Motion blur</option><option>JPEG compression</option></select>
+        </label>
+        <label class="field"><span>Severity</span>
+          <select id="f-severity"><option>All</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+        </label>
+        <label class="field"><span>Recalibration</span>
+          <select id="f-recal"><option>All</option><option>Raw</option><option>Temp. scaling</option><option>DentalCalib-Net</option></select>
+        </label>
+        <button class="btn-primary" id="applyFilters">Apply filters</button>
+      </div>
+
+      <div class="grid-4 stat-strip">
+        <div class="card stat-card center">
+          <div class="stat-label">Avg. ECE</div>
+          <div class="stat-big" id="avg-ece">0.142</div>
+          <div class="stat-delta bad">+0.031 vs baseline</div>
+        </div>
+        <div class="card stat-card center">
+          <div class="stat-label">Avg. MCE</div>
+          <div class="stat-big" id="avg-mce">0.261</div>
+          <div class="stat-delta bad">+0.058 vs baseline</div>
+        </div>
+        <div class="card stat-card center">
+          <div class="stat-label">Avg. D-ECE</div>
+          <div class="stat-big" id="avg-dece">0.189</div>
+          <div class="stat-delta bad">+0.044 vs baseline</div>
+        </div>
+        <div class="card stat-card center">
+          <div class="stat-label">Avg. mAP@0.50</div>
+          <div class="stat-big" id="avg-map">0.334</div>
+          <div class="stat-delta good">−0.082 vs baseline</div>
+        </div>
+      </div>
+
+      <div class="card table-card">
+        <table id="results-table">
+          <thead>
+            <tr>
+              <th>Model</th><th>OOD condition</th><th>Sev.</th><th>ECE (raw)</th><th>ECE (TS)</th>
+              <th>ECE pre</th><th>ECE (DCN)</th><th>MCE</th><th>D-ECE</th><th>mAP@0.50</th><th>Opt. T</th>
+            </tr>
+          </thead>
+          <tbody><!-- populated by script.js --></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PAGE 3: RELIABILITY VIEWER -->
+    <section class="page" id="page-reliability">
+      <header class="page-head">
+        <h1>Reliability Viewer</h1>
+        <p>Inspect calibration curves per model and condition — toggle pre/post recalibration comparison.</p>
+      </header>
+
+      <div class="card filter-bar">
+        <label class="field"><span>Model</span>
+          <select id="rv-model"><option>YOLOv8</option><option>RT-DETR</option></select>
+        </label>
+        <label class="field"><span>OOD condition</span>
+          <select id="rv-condition"><option>Gaussian noise</option><option>Motion blur</option><option>JPEG compression</option></select>
+        </label>
+        <label class="field"><span>Severity</span>
+          <select id="rv-severity"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+        </label>
+        <div class="toggle-group">
+          <span>Recalibration</span>
+          <div class="toggle" id="rv-toggle">
+            <button class="toggle-opt active" data-mode="pre">Pre</button>
+            <button class="toggle-opt" data-mode="post">Post</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Raw — before recalibration</div>
+          <canvas id="chart-rv-raw" height="180"></canvas>
+          <div class="chart-metrics">
+            <span>ECE <b id="rv-raw-ece">0.183</b></span>
+            <span>MCE <b id="rv-raw-mce">0.341</b></span>
+            <span>NLL <b id="rv-raw-nll">1.61</b></span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">DentalCalib-Net — after recalibration</div>
+          <canvas id="chart-rv-recal" height="180"></canvas>
+          <div class="chart-metrics">
+            <span>ECE <b id="rv-recal-ece">0.071</b></span>
+            <span>MCE <b id="rv-recal-mce">0.128</b></span>
+            <span>NLL <b id="rv-recal-nll">0.94</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card note-card">
+        <span id="rv-summary">RD deviation RMSD: raw 0.142 → post-DCN 0.058 · mAP@0.50 unchanged: 0.282 · Safety invariant maintained</span>
+      </div>
+    </section>
+
+    <!-- PAGE 4: OOD DEGRADATION CURVES -->
+    <section class="page" id="page-degradation">
+      <header class="page-head">
+        <h1>OOD Degradation Curves</h1>
+        <p>Visualize accuracy vs. calibration degradation across OOD severity levels per model.</p>
+      </header>
+
+      <div class="card filter-bar">
+        <label class="field"><span>Model</span>
+          <select id="deg-model"><option>YOLOv8</option><option>RT-DETR</option><option>Both</option></select>
+        </label>
+        <label class="field"><span>OOD source</span>
+          <select id="deg-source"><option>DENTEX-C</option><option>Dental-OOD</option></select>
+        </label>
+        <label class="field"><span>Corruption type</span>
+          <select id="deg-corruption"><option>Gaussian noise</option><option>Motion blur</option><option>JPEG compression</option></select>
+        </label>
+        <button class="btn-primary" id="deg-update">Update chart</button>
+      </div>
+
+      <div class="card">
+        <canvas id="chart-degradation" height="220"></canvas>
+      </div>
+
+      <div class="card table-card">
+        <table id="deg-table">
+          <thead>
+            <tr><th>Model</th><th>Spearman ρ</th><th>Decoupling severity</th><th>ECE@S5</th><th>mAP@S5</th><th>Status</th></tr>
+          </thead>
+          <tbody><!-- populated by script.js --></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PAGE 5: DENTALCALIB-NET PIPELINE -->
+    <section class="page" id="page-pipeline">
+      <header class="page-head">
+        <h1>DentalCalib-Net Pipeline</h1>
+        <p>Architecture and mechanism of the quality-aware recalibration method.</p>
+      </header>
+
+      <div class="card">
+        <div class="pipeline-label">A — End-to-end inference pipeline</div>
+        <div class="pipeline-flow">
+          <div class="pipe-node">OPG image</div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-node">Detector<br><small>YOLOv8 / RT-DETR</small></div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-node">Quality extractor<br><small>Laplacian · σ · exposure</small></div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-node accent">DentalCalib-Net<br><small>3-layer MLP</small></div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-node">Calibrated confidence</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="pipeline-label">B — Temperature scaling vs. DentalCalib-Net</div>
+        <div class="grid-2">
+          <div class="pipe-compare">
+            <div class="compare-title">Temperature scaling</div>
+            <p>Fixed scalar T applied uniformly to all inputs. No sensitivity to image or OOD severity.</p>
+          </div>
+          <div class="pipe-compare">
+            <div class="compare-title">DentalCalib-Net</div>
+            <p>Quality-conditioned correction. Larger adjustments for degraded images, smaller for clean ones.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="pipeline-label">C — 8-dimensional input vector</div>
+        <div class="feature-grid">
+          <span class="feature-chip">Raw confidence</span>
+          <span class="feature-chip">BBox w</span>
+          <span class="feature-chip">BBox h</span>
+          <span class="feature-chip">BBox x</span>
+          <span class="feature-chip">BBox y</span>
+          <span class="feature-chip">Laplacian variance</span>
+          <span class="feature-chip">Pixel σ (exposure)</span>
+          <span class="feature-chip">JPEG block score</span>
+        </div>
+        <div class="invariant-note">
+          Safety invariant: DentalCalib-Net modifies confidence scores only. Box coordinates and detection decisions
+          are not altered. mAP@0.50 is monitored across all OOD conditions as verification.
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
