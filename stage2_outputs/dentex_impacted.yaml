@@ -1,0 +1,6 @@
+
+train: /kaggle/input/datasets/duncangirauldgarcia/dentalcalib-net-preprocessed-data/yolo_dataset/yolo_dataset/images/train
+val: /kaggle/input/datasets/duncangirauldgarcia/dentalcalib-net-preprocessed-data/yolo_dataset/yolo_dataset/images/val
+
+nc: 1
+names: ['Impacted']
