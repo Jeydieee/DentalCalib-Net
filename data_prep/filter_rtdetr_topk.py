@@ -52,4 +52,12 @@ if __name__ == "__main__":
             out_path = f"{OUTPUT_DIR}/rtdetr_{corruption}_{severity}_filtered.json"
             process_and_filter(pred_path, out_path, k=K)
 
+    # NEW: also filter the validation set predictions
+    print("\nFiltering RT-DETR validation predictions...")
+    process_and_filter(
+        f"{STAGE2_DIR}/rtdetr_predictions_val.json",
+        f"{OUTPUT_DIR}/rtdetr_predictions_val_filtered.json",
+        k=K,
+    )
+
     print("\nDone.")

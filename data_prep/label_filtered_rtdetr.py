@@ -86,9 +86,10 @@ def process_prediction_file(pred_path, gt_by_filename, out_path):
 
 
 if __name__ == "__main__":
-    GT_PATH = r"D:/DentalCalib-Net/data_prep/repool_output/dentex_merged_1005_resized.json"
-    FILTERED_DIR = r"D:/DentalCalib-Net/stage4_outputs/rtdetr_filtered"
-    OUTPUT_DIR = r"D:/DentalCalib-Net/stage4_outputs/labeled_predictions"
+    GT_PATH = r"D:\DentalCalib-Net\data_prep\repool_output\dentex_merged_1005_resized.json"
+    STAGE2_DIR = r"D:\DentalCalib-Net\stage2_outputs"
+    FILTERED_DIR = r"D:\DentalCalib-Net\stage4_outputs\rtdetr_filtered"
+    OUTPUT_DIR = r"D:\DentalCalib-Net\stage4_outputs\labeled_predictions"
 
     Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
@@ -110,5 +111,21 @@ if __name__ == "__main__":
             pred_path = f"{FILTERED_DIR}/rtdetr_{corruption}_{severity}_filtered.json"
             out_path = f"{OUTPUT_DIR}/rtdetr_{corruption}_{severity}_filtered_labeled.json"
             process_prediction_file(pred_path, gt_by_filename, out_path)
+
+    # NEW: label filtered RT-DETR validation predictions
+    print("\nLabeling filtered RT-DETR validation predictions...")
+    process_prediction_file(
+        f"{FILTERED_DIR}/rtdetr_predictions_val_filtered.json",
+        gt_by_filename,
+        f"{OUTPUT_DIR}/rtdetr_predictions_val_filtered_labeled.json",
+    )
+
+    # NEW: label YOLOv8 validation predictions (no filtering needed)
+    print("\nLabeling YOLOv8 validation predictions...")
+    process_prediction_file(
+        f"{STAGE2_DIR}/yolov8_predictions_val.json",
+        gt_by_filename,
+        f"{OUTPUT_DIR}/yolov8_predictions_val_labeled.json",
+    )
 
     print("\nDone.")
