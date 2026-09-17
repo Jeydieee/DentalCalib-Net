@@ -1,3 +1,5 @@
 dataset_split/
 yolo_dataset/
 stage4_outputs/
+stage5_outputs/
+__pycache__/

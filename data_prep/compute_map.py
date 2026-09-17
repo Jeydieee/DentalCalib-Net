@@ -11,7 +11,91 @@ __all__ = [
     "compute_ap",
     "compute_map",
     "load_predictions",
+    "load_gt_boxes_by_filename",
+    "greedy_match",
+    "greedy_ap",
 ]
+
+
+def _box_iou(box1, box2):
+    x1 = max(box1[0], box2[0])
+    y1 = max(box1[1], box2[1])
+    x2 = min(box1[2], box2[2])
+    y2 = min(box1[3], box2[3])
+    inter = max(0.0, x2 - x1) * max(0.0, y2 - y1)
+    a1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    a2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+    union = a1 + a2 - inter
+    return inter / union if union > 0 else 0.0
+
+
+def load_gt_boxes_by_filename(gt_json_path, category_id_3=0):
+    with open(gt_json_path, "r", encoding="utf-8") as fh:
+        merged = json.load(fh)
+
+    images_by_id = {img["id"]: img["file_name"] for img in merged["images"]}
+
+    gt_by_filename = defaultdict(list)
+    for ann in merged["annotations"]:
+        if ann.get("category_id_3") != category_id_3:
+            continue
+        file_name = images_by_id.get(ann["image_id"])
+        if file_name is None:
+            continue
+        x, y, w, h = ann["bbox"]
+        gt_by_filename[file_name].append([x, y, x + w, y + h])
+
+    return dict(gt_by_filename)
+
+
+def greedy_match(dets, gt_boxes_by_filename, iou_threshold=0.5):
+    """Standard COCO/VOC-style greedy matching: each detection is scored in
+
+    descending confidence order, and can only match a ground-truth box that
+    no earlier (higher-confidence) detection has already claimed. This is
+    required so tp never exceeds the ground-truth count -- unlike the raw
+    per-prediction 'label' field (IoU >= threshold to ANY GT box), which
+    allows multiple overlapping detections to all be counted correct against
+    the same GT box.
+
+    dets: list of {"filename": str, "bbox": [x1,y1,x2,y2], "confidence": float}
+          already in the desired scoring order is NOT required -- this
+          function sorts by confidence itself.
+
+    Returns (labels, order): labels[i] is 1/0 for dets[i] (original order),
+    order is the confidence-descending index order used for AP.
+    """
+    n = len(dets)
+    order = sorted(range(n), key=lambda i: -dets[i]["confidence"])
+
+    claimed = {
+        fname: [False] * len(boxes)
+        for fname, boxes in gt_boxes_by_filename.items()
+    }
+
+    labels = np.zeros(n, dtype=np.int64)
+    for i in order:
+        d = dets[i]
+        gt_boxes = gt_boxes_by_filename.get(d["filename"], [])
+        used = claimed.get(d["filename"])
+        best_iou, best_j = 0.0, -1
+        for j, gt_box in enumerate(gt_boxes):
+            if used is not None and used[j]:
+                continue
+            iou = _box_iou(d["bbox"], gt_box)
+            if iou > best_iou:
+                best_iou, best_j = iou, j
+        if best_iou >= iou_threshold and best_j >= 0:
+            labels[i] = 1
+            claimed[d["filename"]][best_j] = True
+
+    return labels, np.asarray(order, dtype=np.int64)
+
+
+def greedy_ap(dets, gt_boxes_by_filename, n_ground_truth, iou_threshold=0.5,
+              method="all_point"):
+    labels, order = greedy_match(dets, gt_boxes_by_filename, iou_threshold)
+    return compute_ap(labels[order], n_ground_truth, method=method)
 
 
 def compute_ap(labels_sorted, n_ground_truth, method="all_point"):

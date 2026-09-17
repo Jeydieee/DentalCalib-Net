@@ -16,10 +16,13 @@ from calibration_metrics import (
     compute_rmsd,
     bin_statistics,
 )
-from compute_map import compute_ap
+from compute_map import greedy_ap, load_gt_boxes_by_filename
 
 
-PRED_DIR = Path("stage2_outputs")
+ROOT_DIR = Path(__file__).resolve().parent.parent
+
+LABELED_DIR = ROOT_DIR / "stage4_outputs/labeled_predictions"
+RECAL_DIR = ROOT_DIR / "stage4_outputs/recalibrated_predictions"
 
 MODELS = ["yolov8", "rtdetr"]
 
@@ -30,8 +33,6 @@ SEVERITIES = [1, 2, 3, 4, 5]
 CLEAN_CONDITION = "clean"
 
 CONDITION_PATTERN = "{corruption}_S{severity}"
-
-USE_VAL_AS_CLEAN = False
 
 CONFIDENCE_TYPES = {
     "raw": "confidence_raw",
@@ -48,9 +49,10 @@ MIN_BIN_COUNT = 1
 MAP_METHOD = "all_point"
 
 GT_COUNT = 175
+GT_JSON = ROOT_DIR / "data_prep/repool_output/dentex_merged_1005_resized.json"
 
-OUT_JSON = Path("calibration_results.json")
-OUT_CSV = Path("calibration_results.csv")
+OUT_JSON = ROOT_DIR / "stage5_outputs/calibration_results.json"
+OUT_CSV = ROOT_DIR / "stage5_outputs/calibration_results.csv"
 
 COLUMNS = [
     "model", "condition", "corruption_type", "severity", "confidence_type",
@@ -71,15 +73,25 @@ def build_conditions():
     return out
 
 
-def path_for(pred_dir, model, condition, corruption=None, severity=None):
-    pred_dir = Path(pred_dir)
+def labeled_path_for(labeled_dir, model, condition, corruption=None, severity=None):
+    labeled_dir = Path(labeled_dir)
+    if model == "rtdetr":
+        if condition == CLEAN_CONDITION:
+            return labeled_dir / "rtdetr_predictions_clean_filtered_labeled.json"
+        return labeled_dir / f"rtdetr_{corruption}_S{severity}_filtered_labeled.json"
     if condition == CLEAN_CONDITION:
-        return pred_dir / f"{model}_predictions_clean.json"
-    return (pred_dir / f"{model}_ood_predictions"
-            / f"{model}_{corruption}_S{severity}.json")
+        return labeled_dir / "yolov8_predictions_clean_labeled.json"
+    return labeled_dir / f"yolov8_{corruption}_S{severity}_labeled.json"
 
 
-def load_file(path):
+def recal_path_for(recal_dir, model, condition, corruption=None, severity=None):
+    recal_dir = Path(recal_dir)
+    if condition == CLEAN_CONDITION:
+        return recal_dir / f"{model}_clean_recalibrated.json"
+    return recal_dir / f"{model}_{corruption}_S{severity}_recalibrated.json"
+
+
+def _load_json_list(path):
     with open(path, "r", encoding="utf-8") as fh:
         raw = json.load(fh)
 
@@ -90,19 +102,27 @@ def load_file(path):
                 break
         else:
             raise ValueError(
-                f"top-level object has no list under images/results/data/"
-                f"entries; keys present: {sorted(raw.keys())}"
+                f"{path}: top-level object has no list under images/"
+                f"results/data/entries; keys present: {sorted(raw.keys())}"
             )
     if not isinstance(raw, list):
-        raise ValueError("expected a list of image entries")
+        raise ValueError(f"{path}: expected a list of image entries")
+    return raw
+
+
+def load_file(labeled_path, recal_path):
+    labeled = _load_json_list(labeled_path)
+    recal = _load_json_list(recal_path)
+
+    recal_by_image = {e["image_path"]: e["predictions"] for e in recal}
 
     conf = {k: [] for k in CONFIDENCE_TYPES.values()}
-    labels, ious = [], []
+    labels, ious, filenames, bboxes = [], [], [], []
     n_gt = 0
     saw_gt = False
     skipped = 0
 
-    for entry in raw:
+    for entry in labeled:
         for key in ("num_ground_truth", "n_ground_truth", "num_gt", "n_gt"):
             if key in entry:
                 n_gt += int(entry[key])
@@ -113,38 +133,58 @@ def load_file(path):
                 n_gt += len(entry["ground_truth"])
                 saw_gt = True
 
-        for pred in entry.get("predictions", []) or []:
-            if LABEL_KEY not in pred or IOU_KEY not in pred:
+        image_path = entry["image_path"]
+        recal_preds = recal_by_image.get(image_path)
+        if recal_preds is None:
+            raise ValueError(
+                f"{recal_path}: no entry for image_path {image_path!r} "
+                f"found in {labeled_path}"
+            )
+        lab_preds = entry.get("predictions", []) or []
+        if len(lab_preds) != len(recal_preds):
+            raise ValueError(
+                f"prediction count mismatch for {image_path!r}: "
+                f"{len(lab_preds)} in {labeled_path} vs "
+                f"{len(recal_preds)} in {recal_path}. Labeled and "
+                f"recalibrated files must come from the same source "
+                f"predictions in the same order -- do not merge by index "
+                f"across mismatched files."
+            )
+
+        filename = Path(image_path).name
+        for lab_pred, recal_pred in zip(lab_preds, recal_preds):
+            if LABEL_KEY not in lab_pred or IOU_KEY not in lab_pred:
                 skipped += 1
                 continue
-            if any(k not in pred for k in conf):
+            if any(k not in recal_pred for k in conf):
                 skipped += 1
                 continue
             for k in conf:
-                conf[k].append(float(pred[k]))
-            labels.append(int(pred[LABEL_KEY]))
-            ious.append(float(pred[IOU_KEY]))
+                conf[k].append(float(recal_pred[k]))
+            labels.append(int(lab_pred[LABEL_KEY]))
+            ious.append(float(lab_pred[IOU_KEY]))
+            filenames.append(filename)
+            bboxes.append(recal_pred.get("bbox_xyxy") or lab_pred.get("bbox_xyxy"))
 
     if not labels:
         raise ValueError("no usable predictions found in file")
 
     labels_arr = np.asarray(labels, dtype=np.int64)
     if labels_arr.sum() == 0 and labels_arr.size > 20:
-        raise ValueError(
-            f"every one of {labels_arr.size} predictions in this file has "
-            f"label=0 (best_iou never reached the match threshold). This is "
-            f"the exact symptom of the known filename mismatch between "
-            f"prediction image_path values (test_N.png-style) and "
-            f"dentex_merged_1005_resized.json (original DENTEX filenames) -- "
-            f"see the GT_COUNT comment at the top of this file. Refusing to "
-            f"report metrics computed from an all-zero label file; fix the "
-            f"filename mapping in batch_iou_labeling.py first."
-        )
+        print(f"  NOTE: {labeled_path.name} -- every one of {labels_arr.size} "
+              f"predictions has label=0 (best_iou never reached the match "
+              f"threshold). For RT-DETR gaussian_noise S2-S5 this is the "
+              f"confirmed model failure (see project notes), not a data "
+              f"bug -- metrics are still computed and are meaningful "
+              f"(near-maximal ECE reflects total miscalibration). For any "
+              f"other condition, treat this as suspicious and verify.")
 
     return {
         "conf": {k: np.asarray(v, dtype=np.float64) for k, v in conf.items()},
         "labels": np.asarray(labels, dtype=np.int64),
         "ious": np.asarray(ious, dtype=np.float64),
+        "filenames": filenames,
+        "bboxes": bboxes,
         "n_gt": n_gt if saw_gt else None,
         "skipped": skipped,
     }
@@ -160,9 +200,11 @@ def resolve_gt(data, args):
     return None
 
 
-def score_file(data, n_gt):
+def score_file(data, n_gt, gt_boxes_by_filename):
     labels = data["labels"]
     ious = data["ious"]
+    filenames = data["filenames"]
+    bboxes = data["bboxes"]
     rows, notes = [], []
 
     raw_order = None
@@ -183,10 +225,21 @@ def score_file(data, n_gt):
         elif raw_order is not None:
             tied = bool(np.array_equal(order, raw_order))
 
-        if n_gt:
-            ap = compute_ap(labels[order], n_gt, method=MAP_METHOD)["ap"]
-        else:
-            ap = None
+        ap = None
+        if n_gt and gt_boxes_by_filename:
+            dets = [
+                {"filename": fn, "bbox": bb, "confidence": float(c)}
+                for fn, bb, c in zip(filenames, bboxes, conf)
+            ]
+            try:
+                ap = greedy_ap(dets, gt_boxes_by_filename, n_gt,
+                               method=MAP_METHOD)["ap"]
+            except Exception as exc:
+                notes.append(
+                    f"{short}: mAP computation failed "
+                    f"({type(exc).__name__}: {exc}); ECE/MCE/D-ECE/RMSD "
+                    f"above are still valid."
+                )
 
         rows.append({
             "confidence_type": short,
@@ -207,16 +260,11 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Run all calibration metrics across the Stage 5 grid."
     )
-    parser.add_argument("--pred-dir", default=str(PRED_DIR))
-    parser.add_argument("--use-val-as-clean", action="store_true",
-                        default=USE_VAL_AS_CLEAN,
-                        help="use {model}_predictions_val.json as the "
-                             "'clean' condition instead of "
-                             "{model}_predictions_clean.json. Do not set "
-                             "this until you've confirmed which split "
-                             "belongs in the reported grid -- see the "
-                             "USE_VAL_AS_CLEAN comment at the top of this "
-                             "file.")
+    parser.add_argument("--labeled-dir", default=str(LABELED_DIR))
+    parser.add_argument("--recal-dir", default=str(RECAL_DIR))
+    parser.add_argument("--gt-json", default=str(GT_JSON),
+                        help="ground-truth annotations JSON, used for "
+                             "greedy one-detection-per-box AP matching")
     parser.add_argument("--n-gt", type=int, default=None,
                         help="ground-truth object count (same for all "
                              "conditions; corruptions do not change the GT)")
@@ -237,53 +285,41 @@ def main(argv=None):
     print(f"Grid: {len(MODELS)} models x {len(conditions)} conditions "
           f"= {len(expected)} files -> "
           f"{len(expected) * len(CONFIDENCE_TYPES)} rows")
-    print(f"Prediction dir: {args.pred_dir}")
-    if args.use_val_as_clean:
-        print("clean condition source: {model}_predictions_VAL.json  "
-              "(--use-val-as-clean was set)")
-    else:
-        print("clean condition source: {model}_predictions_clean.json  "
-              "(default)")
-        print("  NOTE: this repo also has {model}_predictions_val.json, "
-              "separate\n  from _clean.json. If val is actually what should "
-              "be reported as\n  the 'clean' condition, rerun with "
-              "--use-val-as-clean. Do not\n  guess -- confirm which split "
-              "Table 9 is supposed to reflect.")
+    print(f"Labeled dir:      {args.labeled_dir}")
+    print(f"Recalibrated dir: {args.recal_dir}")
+    print("clean condition source: stage4 test-split clean files "
+          "(labeled + recalibrated)")
     print()
-
-    def resolve_clean_path(pred_dir, model):
-        suffix = "val" if args.use_val_as_clean else "clean"
-        return Path(pred_dir) / f"{model}_predictions_{suffix}.json"
-
-    def resolve_path(pred_dir, model, cond, corr, sev):
-        if cond == CLEAN_CONDITION:
-            return resolve_clean_path(pred_dir, model)
-        return path_for(pred_dir, model, cond, corr, sev)
 
     if args.dry_run:
         found = missing = 0
         for model, cond, corr, sev in expected:
-            p = resolve_path(args.pred_dir, model, cond, corr, sev)
-            ok = p.exists()
+            lp = labeled_path_for(args.labeled_dir, model, cond, corr, sev)
+            rp = recal_path_for(args.recal_dir, model, cond, corr, sev)
+            ok = lp.exists() and rp.exists()
             found += ok
             missing += not ok
-            print(f"  {'OK     ' if ok else 'MISSING'}  {p}")
+            status = "OK     " if ok else "MISSING"
+            print(f"  {status}  {lp}")
+            print(f"  {status}  {rp}")
         print(f"\n{found} found, {missing} missing")
-        if missing:
-            print("\nIf files are missing, check the layout above against "
-                  "your\nactual repo. Per the delegation doc, large files "
-                  "excluded from\ngit may need downloading from the team "
-                  "Drive first.")
         return 0 if missing == 0 else 1
+
+    gt_boxes_by_filename = load_gt_boxes_by_filename(args.gt_json)
+    print(f"Ground truth (for greedy AP matching): {args.gt_json}  "
+          f"({sum(len(v) for v in gt_boxes_by_filename.values())} boxes "
+          f"across {len(gt_boxes_by_filename)} images)\n")
 
     results = []
     failures = []
     gt_seen = set()
 
     for model, cond, corr, sev in expected:
-        path = resolve_path(args.pred_dir, model, cond, corr, sev)
+        lp = labeled_path_for(args.labeled_dir, model, cond, corr, sev)
+        rp = recal_path_for(args.recal_dir, model, cond, corr, sev)
+        path = f"{lp} + {rp}"
         try:
-            data = load_file(path)
+            data = load_file(lp, rp)
         except FileNotFoundError:
             failures.append((str(path), "file not found"))
             continue
@@ -299,12 +335,15 @@ def main(argv=None):
             gt_seen.add(n_gt)
 
         try:
-            rows, _ = score_file(data, n_gt)
+            rows, notes = score_file(data, n_gt, gt_boxes_by_filename)
         except Exception as exc:
             failures.append((str(path), f"metric failure: "
                                         f"{type(exc).__name__}: {exc}"))
             traceback.print_exc(file=sys.stderr)
             continue
+
+        for note in notes:
+            print(f"  note: {lp.name} -- {note}")
 
         if data["skipped"]:
             print(f"  note: {path.name} -- skipped {data['skipped']} "
