@@ -1,0 +1,3 @@
+Model,Architecture,ECE,MCE,D-ECE,RD Deviation (RMSD),mAP@0.50
+YOLOV8,One-Stage Anchor-Free,0.0605,0.3215,0.1087,0.089,0.9099
+RT-DETR,Transformer-Based,0.012,0.3298,0.0421,0.0322,0.8871
