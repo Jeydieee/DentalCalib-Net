@@ -47,108 +47,110 @@
     </div>
 
     <!-- PAGE 1: LIVE OPG AUDITOR -->
-    <section class="page active" id="page-auditor">
-      <header class="page-head">
-        <h1>Live OPG Auditor</h1>
-        <p>Upload a panoramic dental radiograph and run live calibration inference on both models.</p>
-      </header>
+<section class="page active" id="page-auditor">
+  <header class="page-head">
+    <h1>Live OPG Auditor</h1>
+    <p>Upload a panoramic dental radiograph and run live calibration inference on both models.</p>
+  </header>
 
-            <div class="card upload-card" id="dropzone">
-        <input type="file" id="fileInput" accept="image/*" hidden>
-        <div class="upload-icon">+</div>
-        <div class="upload-title">Upload a panoramic dental radiograph</div>
-        <div class="upload-sub">JPG or PNG · must be from the DENTEX 2023 test set</div>
-      </div>
-      <div class="sim-note">
-        <span class="sim-chip">REAL DATA</span>
-        Only images from the 201-image DENTEX test partition have precomputed results.
-        Uploading any other image will show an error rather than fabricated numbers.
-      </div>
+  <div class="card upload-card" id="dropzone">
+    <input type="file" id="fileInput" accept="image/*" hidden>
+    <div class="upload-icon">+</div>
+    <div class="upload-title">Upload a panoramic dental radiograph</div>
+    <div class="upload-sub">JPG or PNG · must be from the DENTEX 2023 test set</div>
+  </div>
+  <div class="sim-note">
+    <span class="sim-chip">REAL DATA</span>
+    Only images from the 201-image DENTEX test partition have precomputed results.
+    Uploading any other image will show an error rather than fabricated numbers.
+  </div>
 
-      <div class="controls-row">
-        <label class="field">
-          <span>OOD condition</span>
-          <select id="oodCondition">
-            <option>None (clean)</option>
-            <option>Gaussian noise</option>
-            <option>Motion blur</option>
-            <option>JPEG compression</option>
-            <option>Pixel exposure</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Severity (1–5)</span>
-          <input type="range" min="1" max="5" value="3" id="severity">
-        </label>
-        <label class="field">
-          <span>Recalibration</span>
-          <select id="recalMethod">
-            <option>None (raw)</option>
-            <option>Temperature scaling</option>
-            <option>DentalCalib-Net</option>
-          </select>
-        </label>
-        <button class="btn-primary" id="runInference">Run inference (simulated)</button>
-      </div>
+  <div class="controls-row">
+    <label class="field">
+      <span>OOD condition</span>
+      <select id="oodCondition">
+        <option>None (clean)</option>
+        <option>Gaussian noise</option>
+        <option>Motion blur</option>
+        <option>JPEG compression</option>
+        <option>Pixel exposure</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>Severity (1–5)</span>
+      <input type="range" min="1" max="5" value="3" id="severity">
+    </label>
+    <label class="field">
+      <span>Recalibration</span>
+      <select id="recalMethod">
+        <option>None (raw)</option>
+        <option>Temperature scaling</option>
+        <option>DentalCalib-Net</option>
+      </select>
+    </label>
+    <button class="btn-primary" id="runInference">Run inference (simulated)</button>
+  </div>
 
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-title">YOLOv8 — One-stage anchor-free</div>
-          <div class="opg-preview" id="preview-yolo">
-            <canvas id="canvas-yolo" width="640" height="640" style="width:100%;height:100%;object-fit:contain;"></canvas>
-            <span class="placeholder">OPG image</span>
-          </div>
-          <div class="metric-row">
-            <span>ECE <b id="yolo-ece">0.142</b></span>
-            <span>MCE <b id="yolo-mce">0.261</b></span>
-            <span>D-ECE <b id="yolo-dece">0.189</b></span>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title">RT-DETR — Transformer, IoU-aware</div>
-          <div class="opg-preview" id="preview-rtdetr">
-            <canvas id="canvas-rtdetr" width="640" height="640" style="width:100%;height:100%;object-fit:contain;"></canvas>
-            <span class="placeholder">OPG image</span>
-          </div>
-          <div class="metric-row">
-            <span>ECE <b id="rtdetr-ece">0.097</b></span>
-            <span>MCE <b id="rtdetr-mce">0.183</b></span>
-            <span>D-ECE <b id="rtdetr-dece">0.134</b></span>
-          </div>
-        </div>
+  <!-- YOLOv8 row: image | data | graph -->
+  <div class="card model-card">
+    <div class="card-title">YOLOv8 — One-stage anchor-free</div>
+    <div class="model-row">
+      <div class="opg-preview" id="preview-yolo">
+        <canvas id="canvas-yolo" width="640" height="640" style="width:100%;height:100%;object-fit:contain;"></canvas>
+        <span class="placeholder">OPG image</span>
       </div>
+      <div class="model-metrics">
+        <div class="metric-item"><span>ECE</span><b id="yolo-ece">0.142</b></div>
+        <div class="metric-item"><span>MCE</span><b id="yolo-mce">0.261</b></div>
+        <div class="metric-item"><span>D-ECE</span><b id="yolo-dece">0.189</b></div>
+      </div>
+      <div class="model-chart">
+        <div class="chart-label">Reliability diagram</div>
+        <div class="chart-wrap"><canvas id="chart-rel-yolo" height="160"></canvas></div>
+        <div class="chart-note" id="yolo-chart-note">—</div>
+      </div>
+    </div>
+  </div>
 
-      <div class="grid-3 stat-strip">
-        <div class="card stat-card">
-          <div class="stat-label">Expected Calibration Error (ECE)</div>
-          <div class="stat-pair"><span>YOLOv8 <b id="s1-yolo">0.142</b></span><span>RT-DETR <b id="s1-rt">0.097</b></span></div>
-          <div class="stat-delta" id="s1-delta">—</div>
-        </div>
-        <div class="card stat-card">
-          <div class="stat-label">Max Calibration Error (MCE)</div>
-          <div class="stat-pair"><span>YOLOv8 <b id="s2-yolo">0.261</b></span><span>RT-DETR <b id="s2-rt">0.183</b></span></div>
-          <div class="stat-delta" id="s2-delta">—</div>
-        </div>
-        <div class="card stat-card">
-          <div class="stat-label">Detection Calib. Error (D-ECE)</div>
-          <div class="stat-pair"><span>YOLOv8 <b id="s3-yolo">0.189</b></span><span>RT-DETR <b id="s3-rt">0.134</b></span></div>
-          <div class="stat-delta" id="s3-delta">—</div>
-        </div>
+  <!-- RT-DETR row: image | data | graph -->
+  <div class="card model-card">
+    <div class="card-title">RT-DETR — Transformer, IoU-aware</div>
+    <div class="model-row">
+      <div class="opg-preview" id="preview-rtdetr">
+        <canvas id="canvas-rtdetr" width="640" height="640" style="width:100%;height:100%;object-fit:contain;"></canvas>
+        <span class="placeholder">OPG image</span>
       </div>
+      <div class="model-metrics">
+        <div class="metric-item"><span>ECE</span><b id="rtdetr-ece">0.097</b></div>
+        <div class="metric-item"><span>MCE</span><b id="rtdetr-mce">0.183</b></div>
+        <div class="metric-item"><span>D-ECE</span><b id="rtdetr-dece">0.134</b></div>
+      </div>
+      <div class="model-chart">
+        <div class="chart-label">Reliability diagram</div>
+        <div class="chart-wrap"><canvas id="chart-rel-rtdetr" height="160"></canvas></div>
+        <div class="chart-note" id="rtdetr-chart-note">—</div>
+      </div>
+    </div>
+  </div>
 
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-title">YOLOv8 — Reliability diagram</div>
-          <canvas id="chart-rel-yolo" height="160"></canvas>
-          <div class="chart-note" id="yolo-chart-note">—</div>
-        </div>
-        <div class="card">
-          <div class="card-title">RT-DETR — Reliability diagram</div>
-          <canvas id="chart-rel-rtdetr" height="160"></canvas>
-          <div class="chart-note" id="rtdetr-chart-note">—</div>
-        </div>
-      </div>
-    </section>
+  <div class="grid-3 stat-strip">
+    <div class="card stat-card">
+      <div class="stat-label">Expected Calibration Error (ECE)</div>
+      <div class="stat-pair"><span>YOLOv8 <b id="s1-yolo">0.142</b></span><span>RT-DETR <b id="s1-rt">0.097</b></span></div>
+      <div class="stat-delta" id="s1-delta">—</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">Max Calibration Error (MCE)</div>
+      <div class="stat-pair"><span>YOLOv8 <b id="s2-yolo">0.261</b></span><span>RT-DETR <b id="s2-rt">0.183</b></span></div>
+      <div class="stat-delta" id="s2-delta">—</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">Detection Calib. Error (D-ECE)</div>
+      <div class="stat-pair"><span>YOLOv8 <b id="s3-yolo">0.189</b></span><span>RT-DETR <b id="s3-rt">0.134</b></span></div>
+      <div class="stat-delta" id="s3-delta">—</div>
+    </div>
+  </div>
+</section>
 
     <!-- PAGE 2: BENCHMARK EXPLORER -->
     <section class="page" id="page-explorer">
@@ -285,8 +287,8 @@
         <button class="btn-primary" id="deg-update">Update chart</button>
       </div>
 
-      <div class="card">
-        <canvas id="chart-degradation" height="220"></canvas>
+      <div class="deg-chart-wrap">
+        <canvas id="chart-degradation"></canvas>
       </div>
 
       <div class="card table-card">

@@ -445,3 +445,48 @@ button:focus-visible, select:focus-visible, input:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
+/* ===== Live OPG: per-model horizontal row (image | data | graph) ===== */
+.model-row {
+  display: grid;
+  grid-template-columns: 240px 130px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.model-row .opg-preview { max-width: none; margin: 0; width: 100%; }
+
+.model-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 20px;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  align-self: stretch;
+  justify-content: center;
+}
+
+.metric-item { font-size: 11.5px; color: var(--ink-soft); }
+.metric-item b { display: block; font-family: var(--mono); font-size: 20px; font-weight: 600; color: var(--ink); margin-top: 2px; }
+
+.model-chart { min-width: 0; }
+.chart-label { font-size: 11.5px; color: var(--ink-soft); margin-bottom: 6px; }
+.chart-wrap { position: relative; width: 100%; height: 240px; }
+.chart-wrap canvas { max-width: 100%; }
+
+@media (max-width: 900px) {
+  .model-row { grid-template-columns: 1fr; }
+  .model-row .opg-preview { max-width: 320px; margin: 0 auto; }
+  .model-metrics {
+    flex-direction: row; justify-content: space-between;
+    padding: 12px 0; border: none;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  }
+}
+.opg-preview { position: relative; }
+.opg-preview .placeholder {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+/* ===== OOD page: mid-size chart that scales with window height ===== */
+.deg-chart-wrap { position: relative; width: 100%; height: clamp(220px, 34vh, 320px); }

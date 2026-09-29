@@ -95,8 +95,9 @@ function reliabilityChart(canvasId, bins, color) {
         },
       ],
     },
-    options: {
+  options: {
       responsive: true,
+      maintainAspectRatio: !ctx.closest(".chart-wrap"), // <-- add this line
       scales: {
         x: { type: "linear", min: 0, max: 1, title: { display: true, text: "Confidence" }, grid: { color: "#EEEBE1" } },
         y: { min: 0, max: 1, title: { display: true, text: "Accuracy" }, grid: { color: "#EEEBE1" } },
@@ -122,6 +123,9 @@ async function loadCalibrationData() {
   }
   return calibrationData;
 }
+
+reliabilityChart("chart-rel-yolo", [], "#C4501E");
+reliabilityChart("chart-rel-rtdetr", [], "#2F7D4F");
 
 // Page 3: reliability viewer chart objects (created once, updated by refreshReliabilityViewer)
 let rvRawChart = reliabilityChart("chart-rv-raw", [], "#C4501E");
@@ -276,6 +280,7 @@ function renderDegradationChart() {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       scales: {
         x: { title: { display: true, text: "OOD severity" }, grid: { display: false } },
         y: { position: "left", title: { display: true, text: "ECE" }, grid: { color: "#EEEBE1" } },
