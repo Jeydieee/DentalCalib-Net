@@ -1,17 +1,24 @@
 /* ==========================================================
-   DentCalib UI — demo interactivity + mock data.
+   DentCalib UI — Confidence Calibration Benchmark for
+   Impacted Tooth Detection (YOLOv8 / RT-DETR / DentalCalib-Net).
 
-   IMPORTANT: every number in this file is fabricated with
-   Math.random(). There is no trained YOLOv8 / RT-DETR model
-   behind this UI, and the thesis has no completed results yet
-   (Chapters 1-3 only — Methodology, no Results chapter, and the
-   result tables in the appendix are unfilled templates). Do not
-   treat any value rendered by this file as a real finding.
+   Data sources: precomputed calibration metrics, reliability
+   bins, per-image predictions, and NLL values, exported from the
+   thesis's Stage 5 pipeline (see /data and /images). Pages 1-3
+   (Live OPG Auditor, Benchmark Explorer, Reliability Viewer) read
+   real data via the loaders below (loadCalibrationData,
+   loadReliabilityBins, loadPerImagePredictions, loadNllData,
+   loadTestImageList).
 
-   When real results exist, replace the generator functions below
-   (reliabilityBins, degradationSeries, generateResultsRows, the
-   hardcoded rows in renderDegTable) with a fetch() call to a JSON
-   file or API that serves your actual computed metrics.
+   Page 4 (OOD Degradation Curves) is NOT yet wired to real data --
+   degradationSeries() and renderDegTable() below still use
+   Math.random() and hardcoded rows. Do not treat Page 4's numbers
+   as real findings until that page is integrated the same way as
+   Pages 1-3.
+
+   The Live OPG Auditor only accepts uploads matching filenames
+   from the 201-image DENTEX test partition; it does not run live
+   inference on arbitrary images (see handleUploadedFile).
    ========================================================== */
 
 // ---------- Navigation ----------
@@ -367,6 +374,28 @@ function visibleMethods() {
   return map[recal] || ["raw", "ts", "dcn"];
 }
 
+function computeBaselineAvg(pivoted, methods) {
+  const cleanRows = pivoted.filter(r => r.condition === "clean");
+  const vals = [];
+  cleanRows.forEach(r => methods.forEach(m => {
+    if (r[`ece_${m}`] != null) vals.push(r[`ece_${m}`]);
+  }));
+  return {
+    ece: vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null,
+    mce: cleanRows.length ? cleanRows.reduce((s, r) => s + r.mce, 0) / cleanRows.length : null,
+    dece: cleanRows.length ? cleanRows.reduce((s, r) => s + r.dece, 0) / cleanRows.length : null,
+    map50: cleanRows.length ? cleanRows.reduce((s, r) => s + r.map50, 0) / cleanRows.length : null,
+  };
+}
+
+function deltaCaption(current, baseline, metricName, higherIsWorse = true) {
+  if (baseline == null) return { text: `No baseline for ${metricName}`, cls: "" };
+  const diff = current - baseline;
+  const cls = (diff > 0) === higherIsWorse ? "bad" : "good";
+  const sign = diff >= 0 ? "+" : "";
+  return { text: `${sign}${diff.toFixed(3)} vs baseline`, cls };
+}
+
 async function renderResultsTable() {
   const raw = await loadCalibrationData();
   const pivoted = pivotByCondition(raw);
@@ -404,10 +433,30 @@ async function renderResultsTable() {
   }));
   const avg = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
 
-  document.getElementById("avg-ece").textContent = eceVals.length ? fmt(avg(eceVals)) : "—";
-  document.getElementById("avg-mce").textContent = fmt(avg(filtered.map(r => r.mce)));
-  document.getElementById("avg-dece").textContent = fmt(avg(filtered.map(r => r.dece)));
-  document.getElementById("avg-map").textContent = fmt(avg(filtered.map(r => r.map50)));
+  const baseline = computeBaselineAvg(pivoted, methods);
+  const avgEce = eceVals.length ? avg(eceVals) : null;
+  const avgMce = avg(filtered.map(r => r.mce));
+  const avgDece = avg(filtered.map(r => r.dece));
+  const avgMap = avg(filtered.map(r => r.map50));
+
+  document.getElementById("avg-ece").textContent = avgEce != null ? fmt(avgEce) : "—";
+  document.getElementById("avg-mce").textContent = fmt(avgMce);
+  document.getElementById("avg-dece").textContent = fmt(avgDece);
+  document.getElementById("avg-map").textContent = fmt(avgMap);
+
+  const eceDelta = avgEce != null ? deltaCaption(avgEce, baseline.ece, "ECE") : { text: "—", cls: "" };
+  const mceDelta = deltaCaption(avgMce, baseline.mce, "MCE");
+  const deceDelta = deltaCaption(avgDece, baseline.dece, "D-ECE");
+  const mapDelta = deltaCaption(avgMap, baseline.map50, "mAP@0.50", false); // higher mAP is better, so higherIsWorse=false
+
+  document.getElementById("ece-delta").textContent = eceDelta.text;
+  document.getElementById("ece-delta").className = `stat-delta ${eceDelta.cls}`;
+  document.getElementById("mce-delta").textContent = mceDelta.text;
+  document.getElementById("mce-delta").className = `stat-delta ${mceDelta.cls}`;
+  document.getElementById("dece-delta").textContent = deceDelta.text;
+  document.getElementById("dece-delta").className = `stat-delta ${deceDelta.cls}`;
+  document.getElementById("map-delta").textContent = mapDelta.text;
+  document.getElementById("map-delta").className = `stat-delta ${mapDelta.cls}`;
 }
 
 renderResultsTable();
@@ -637,15 +686,3 @@ document.getElementById("runInference")?.addEventListener("click", () => {
 });
 
 loadTestImageList();
-
-function calibrationInterpretation(binEntry) {
-  if (!binEntry) return { text: "No data for this condition", cls: "" };
-  const gaps = binEntry.confidence.map((c, i) => c - binEntry.accuracy[i]);
-  const meanGap = gaps.reduce((s, g) => s + g, 0) / gaps.length;
-  const maxGap = Math.max(...gaps.map(Math.abs));
-
-  if (maxGap < 0.05) return { text: "Closely follows the diagonal", cls: "good" };
-  if (meanGap > 0.05) return { text: "Overconfident: predicted confidence exceeds observed accuracy", cls: "bad" };
-  if (meanGap < -0.05) return { text: "Underconfident: predicted confidence trails observed accuracy", cls: "bad" };
-  return { text: "Roughly calibrated, with some bin-level deviation", cls: "good" };
-}
