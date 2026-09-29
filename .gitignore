@@ -2,3 +2,5 @@ dataset_split/
 yolo_dataset/
 stage4_outputs/
 __pycache__/
+frontend/data/
+frontend/images/

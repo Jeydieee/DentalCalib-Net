@@ -285,7 +285,9 @@ body {
 .opg-preview {
   background: #F0EEE7;
   border-radius: 4px;
-  height: 140px;
+  aspect-ratio: 1 / 1;
+  max-width: 320px;
+  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
