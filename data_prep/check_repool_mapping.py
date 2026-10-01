@@ -1,4 +1,9 @@
-REPOOL_JSON = r"D:\DentalCalib-Net\data_prep\repool_output\dentex_merged_1005_resized.json"
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
+REPOOL_JSON = project_path("data_prep", "repool_output", "dentex_merged_1005_resized.json")
 
 import json
 

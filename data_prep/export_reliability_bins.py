@@ -1,10 +1,15 @@
-LABELED_DIR = r"D:\DentalCalib-Net\stage4_outputs\labeled_predictions"
-RECAL_DIR = r"D:\DentalCalib-Net\stage4_outputs\recalibrated_predictions"
-OUT_PATH = r"D:\DentalCalib-Net\frontend\data\reliability_bins.json"
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
+LABELED_DIR = project_path("stage4_outputs", "labeled_predictions")
+RECAL_DIR = project_path("stage4_outputs", "recalibrated_predictions")
+OUT_PATH = project_path("frontend", "data", "reliability_bins.json")
 
 import json
 import sys
-sys.path.insert(0, r"D:\DentalCalib-Net\data_prep")
+sys.path.insert(0, project_path("data_prep"))
 from calibration_metrics import bin_statistics
 
 CORRUPTIONS = ["gaussian_noise", "motion_blur", "brightness_variation", "jpeg_compression"]

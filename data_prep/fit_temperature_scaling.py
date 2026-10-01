@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 import numpy as np
 from scipy.optimize import minimize_scalar
@@ -50,8 +55,8 @@ def fit_temperature(vectors_path):
 
 
 if __name__ == "__main__":
-    VECTORS_DIR = r"D:\DentalCalib-Net\stage4_outputs\training_vectors"
-    OUTPUT_PATH = r"D:\DentalCalib-Net\stage4_outputs\temperature_scaling_params.json"
+    VECTORS_DIR = project_path("stage4_outputs", "training_vectors")
+    OUTPUT_PATH = project_path("stage4_outputs", "temperature_scaling_params.json")
 
     results = {}
 

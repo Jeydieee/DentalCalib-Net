@@ -1,11 +1,16 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 import pandas as pd
 from pathlib import Path
 
-COCO_JSON = r"D:/DentalCalib-Net/data_prep/repool_output/dentex_merged_1005_resized.json"
-TRAIN_IDS_CSV = r"D:/DentalCalib-Net/data_prep/split_output/train_ids.csv"
-VAL_IDS_CSV = r"D:/DentalCalib-Net/data_prep/split_output/val_ids.csv"
-OUTPUT_BASE = r"D:/DentalCalib-Net/yolo_dataset"
+COCO_JSON = project_path("data_prep", "repool_output", "dentex_merged_1005_resized.json")
+TRAIN_IDS_CSV = project_path("data_prep", "split_output", "train_ids.csv")
+VAL_IDS_CSV = project_path("data_prep", "split_output", "val_ids.csv")
+OUTPUT_BASE = project_path("yolo_dataset")
 
 def load_coco(path):
     with open(path) as f:

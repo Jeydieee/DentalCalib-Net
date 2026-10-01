@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 import numpy as np
 
@@ -28,8 +33,8 @@ def aggregate_by_model_and_type(results, metric):
 
 
 if __name__ == "__main__":
-    ORIGINAL_PATH = r"D:\DentalCalib-Net\stage5_outputs\calibration_results.json"
-    UNWEIGHTED_PATH = r"D:\DentalCalib-Net\stage5_outputs\calibration_results_unweighted.json"
+    ORIGINAL_PATH = project_path("stage5_outputs", "calibration_results.json")
+    UNWEIGHTED_PATH = project_path("stage5_outputs", "calibration_results_unweighted.json")
 
     original = load_results(ORIGINAL_PATH)
     unweighted = load_results(UNWEIGHTED_PATH)

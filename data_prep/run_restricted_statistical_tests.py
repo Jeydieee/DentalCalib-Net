@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 import numpy as np
 from scipy.stats import wilcoxon
@@ -133,8 +138,8 @@ def run_restricted_comparison(data, models, metrics, method_pairs):
 
 
 if __name__ == "__main__":
-    RESULTS_PATH = r"D:\DentalCalib-Net\stage5_outputs\calibration_results.json"
-    OUTPUT_PATH = r"D:\DentalCalib-Net\stage5_outputs\statistical_tests_restricted.json"
+    RESULTS_PATH = project_path("stage5_outputs", "calibration_results.json")
+    OUTPUT_PATH = project_path("stage5_outputs", "statistical_tests_restricted.json")
 
     data = load_results(RESULTS_PATH)
     print(f"Original rows: {len(data)}")

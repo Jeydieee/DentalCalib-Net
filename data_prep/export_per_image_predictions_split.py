@@ -1,5 +1,10 @@
-QUADRANT_DIR = r"D:\DentalCalib-Net\stage4_outputs\quadrant_labeled_predictions"
-OUT_DIR = r"D:\DentalCalib-Net\frontend\data\per_image"
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
+QUADRANT_DIR = project_path("stage4_outputs", "quadrant_labeled_predictions")
+OUT_DIR = project_path("frontend", "data", "per_image")
 
 import json
 from pathlib import Path

@@ -1,10 +1,15 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 import numpy as np
 import pandas as pd
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(r"D:\DentalCalib-Net\data_prep")))
+sys.path.insert(0, str(Path(project_path("data_prep"))))
 from compute_map import greedy_ap
 
 
@@ -52,10 +57,10 @@ def build_dets(predictions_path):
 
 
 if __name__ == "__main__":
-    GT_PATH = r"D:\DentalCalib-Net\data_prep\repool_output\dentex_merged_1005_resized.json"
-    STAGE2_DIR = r"D:\DentalCalib-Net\stage2_outputs"
+    GT_PATH = project_path("data_prep", "repool_output", "dentex_merged_1005_resized.json")
+    STAGE2_DIR = project_path("stage2_outputs")
 
-    val_ids = set(pd.read_csv(r"D:\DentalCalib-Net\data_prep\split_output\val_ids.csv")['image_id'].tolist())
+    val_ids = set(pd.read_csv(project_path("data_prep", "split_output", "val_ids.csv"))['image_id'].tolist())
 
     gt_val = build_gt_lookup(GT_PATH, val_ids)
     n_gt_val = sum(len(boxes) for boxes in gt_val.values())

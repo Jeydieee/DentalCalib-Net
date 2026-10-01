@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 from pathlib import Path
 
@@ -72,8 +77,8 @@ def save_table_csv(rows, path):
 
 
 if __name__ == "__main__":
-    CALIBRATION_RESULTS_PATH = r"D:\DentalCalib-Net\stage5_outputs\calibration_results.json"
-    OUTPUT_DIR = r"D:\DentalCalib-Net\stage5_outputs\compiled_tables"
+    CALIBRATION_RESULTS_PATH = project_path("stage5_outputs", "calibration_results.json")
+    OUTPUT_DIR = project_path("stage5_outputs", "compiled_tables")
 
     Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 

@@ -1,5 +1,10 @@
-CSV_PATH = r"D:\DentalCalib-Net\stage5_outputs\nll_results.csv"
-OUT_PATH = r"D:\DentalCalib-Net\frontend\data\nll_results.json"
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
+CSV_PATH = project_path("stage5_outputs", "nll_results.csv")
+OUT_PATH = project_path("frontend", "data", "nll_results.json")
 
 import csv
 import json

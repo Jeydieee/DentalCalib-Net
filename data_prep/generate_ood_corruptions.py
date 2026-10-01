@@ -1,10 +1,15 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import cv2
 import numpy as np
 from pathlib import Path
 import imgaug.augmenters as iaa
 
-TEST_DIR = r"D:/DentalCalib-Net/dataset_split/test"
-OUTPUT_BASE = r"D:/DentalCalib-Net/dataset_split/ood"
+TEST_DIR = project_path("dataset_split", "test")
+OUTPUT_BASE = project_path("dataset_split", "ood")
 
 SEVERITY_LEVELS = [1, 2, 3, 4, 5]
 

@@ -1,6 +1,11 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 
-with open(r"D:\DentalCalib-Net\stage4_outputs\recalibrated_predictions\yolov8_clean_recalibrated.json") as f:
+with open(project_path("stage4_outputs", "recalibrated_predictions", "yolov8_clean_recalibrated.json")) as f:
     data = json.load(f)
 
 print("Available keys in a sample prediction:")

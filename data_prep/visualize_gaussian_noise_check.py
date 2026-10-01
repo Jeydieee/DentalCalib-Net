@@ -1,11 +1,16 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 import cv2
 from pathlib import Path
 
-GT_PATH = r"D:/DentalCalib-Net/data_prep/repool_output/dentex_merged_1005_resized.json"
-RTDETR_OOD_DIR = r"D:/DentalCalib-Net/stage2_outputs/rtdetr_ood_predictions"
-IMAGE_DIR = r"D:/DentalCalib-Net/dataset_split/ood/gaussian_noise"
-OUTPUT_DIR = r"D:/DentalCalib-Net/stage4_outputs/visual_check"
+GT_PATH = project_path("data_prep", "repool_output", "dentex_merged_1005_resized.json")
+RTDETR_OOD_DIR = project_path("stage2_outputs", "rtdetr_ood_predictions")
+IMAGE_DIR = project_path("dataset_split", "ood", "gaussian_noise")
+OUTPUT_DIR = project_path("stage4_outputs", "visual_check")
 
 def load_ground_truth(json_path):
     with open(json_path) as f:

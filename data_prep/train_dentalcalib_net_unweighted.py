@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 import numpy as np
 import torch
@@ -101,8 +106,8 @@ def train_dentalcalib_net(X, y, model_name, epochs=100, patience=10, batch_size=
 
 
 if __name__ == "__main__":
-    VECTORS_DIR = r"D:\DentalCalib-Net\stage4_outputs\training_vectors"
-    OUTPUT_DIR = r"D:\DentalCalib-Net\stage4_outputs\dentalcalib_net_models"
+    VECTORS_DIR = project_path("stage4_outputs", "training_vectors")
+    OUTPUT_DIR = project_path("stage4_outputs", "dentalcalib_net_models")
     Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
     # YOLOv8 -- unchanged, already converged with early stopping at epoch 71

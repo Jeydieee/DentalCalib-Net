@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 
 def compute_iou(box1, box2):
@@ -46,7 +51,7 @@ def load_ground_truth(json_path):
     return gt_by_filename
   
 if __name__ == "__main__":
-    GT_PATH = r"D:/DentalCalib-Net/data_prep/repool_output/dentex_merged_1005_resized.json"
+    GT_PATH = project_path("data_prep", "repool_output", "dentex_merged_1005_resized.json")
 
     gt_by_filename = load_ground_truth(GT_PATH)
 

@@ -1,6 +1,11 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 
-with open(r"D:\DentalCalib-Net\data_prep\quality_features.json") as f:
+with open(project_path("data_prep", "quality_features.json")) as f:
     data = json.load(f)
 
 print("Partitions:", list(data.keys()))

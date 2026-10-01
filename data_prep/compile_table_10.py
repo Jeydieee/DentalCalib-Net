@@ -1,4 +1,9 @@
 from __future__ import annotations
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 
 import csv
 import json
@@ -24,9 +29,9 @@ QUADRANTS = [1, 2, 3, 4]
 N_BINS = 15
 MIN_BIN_COUNT = 1
 
-QUADRANT_LABELED_DIR = r"D:\DentalCalib-Net\stage4_outputs\quadrant_labeled_predictions"
-OUT_JSON = r"D:\DentalCalib-Net\stage5_outputs\table_10_per_quadrant.json"
-OUT_CSV = r"D:\DentalCalib-Net\stage5_outputs\table_10_per_quadrant.csv"
+QUADRANT_LABELED_DIR = project_path("stage4_outputs", "quadrant_labeled_predictions")
+OUT_JSON = project_path("stage5_outputs", "table_10_per_quadrant.json")
+OUT_CSV = project_path("stage5_outputs", "table_10_per_quadrant.csv")
 
 COLUMNS = [
     "model", "quadrant", "confidence_type",

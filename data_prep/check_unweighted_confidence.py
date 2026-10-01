@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 import numpy as np
 import torch
@@ -57,8 +62,8 @@ def check_confidence_vs_true_rate(model_name, vectors_path, checkpoint_path):
 
 
 if __name__ == "__main__":
-    VECTORS_DIR = r"D:\DentalCalib-Net\stage4_outputs\training_vectors"
-    MODELS_DIR = r"D:\DentalCalib-Net\stage4_outputs\dentalcalib_net_models"
+    VECTORS_DIR = project_path("stage4_outputs", "training_vectors")
+    MODELS_DIR = project_path("stage4_outputs", "dentalcalib_net_models")
 
     check_confidence_vs_true_rate(
         "yolov8",

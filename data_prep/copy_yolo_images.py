@@ -1,12 +1,17 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import shutil
 from pathlib import Path
 
 SOURCE_DIRS = {
-    'train': r"D:/DentalCalib-Net/dataset_split/train",
-    'val': r"D:/DentalCalib-Net/dataset_split/val",
+    'train': project_path("dataset_split", "train"),
+    'val': project_path("dataset_split", "val"),
 }
 
-OUTPUT_BASE = r"D:\DentalCalib-Net\yolo_dataset"
+OUTPUT_BASE = project_path("yolo_dataset")
 
 def copy_images(partition, source_dir, labels_dir, images_out_dir):
     """Copy only images that have a corresponding label file --

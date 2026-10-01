@@ -1,7 +1,12 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 from collections import Counter
 
-with open(r"D:/DentalCalib-Net/data_prep/repool_output/dentex_merged_1005.json") as f:
+with open(project_path("data_prep", "repool_output", "dentex_merged_1005.json")) as f:
     merged = json.load(f)
 
 filenames = [img['file_name'] for img in merged['images']]

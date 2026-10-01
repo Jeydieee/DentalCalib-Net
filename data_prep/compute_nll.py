@@ -1,6 +1,11 @@
-CSV_LABELED_DIR = r"D:\DentalCalib-Net\stage4_outputs\labeled_predictions"
-CSV_RECAL_DIR = r"D:\DentalCalib-Net\stage4_outputs\recalibrated_predictions"
-OUT_PATH = r"D:\DentalCalib-Net\stage5_outputs\nll_results.csv"
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
+CSV_LABELED_DIR = project_path("stage4_outputs", "labeled_predictions")
+CSV_RECAL_DIR = project_path("stage4_outputs", "recalibrated_predictions")
+OUT_PATH = project_path("stage5_outputs", "nll_results.csv")
 
 import json
 import csv

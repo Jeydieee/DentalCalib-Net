@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 import numpy as np
 import torch
@@ -25,7 +30,7 @@ def inspect_normalization(model_key):
     print(f"\n=== {model_key.upper()} ===")
 
     # 1. Load the saved checkpoint's normalization stats (used at inference)
-    checkpoint_path = f"D:/DentalCalib-Net/stage4_outputs/dentalcalib_net_models/dentalcalib_net_{model_key}.pt"
+    checkpoint_path = project_path(f"stage4_outputs/dentalcalib_net_models/dentalcalib_net_{model_key}.pt")
     checkpoint = torch.load(checkpoint_path, weights_only=False)
     saved_mean = checkpoint['feature_mean']
     saved_std = checkpoint['feature_std']
@@ -33,7 +38,7 @@ def inspect_normalization(model_key):
     print(f"Saved (training-time) feature_std:  {saved_std}")
 
     # 2. Load the ORIGINAL training vectors and recompute mean/std from scratch
-    vectors_path = f"D:/DentalCalib-Net/stage4_outputs/training_vectors/{model_key}_val_vectors.json"
+    vectors_path = project_path(f"stage4_outputs/training_vectors/{model_key}_val_vectors.json")
     with open(vectors_path) as f:
         data = json.load(f)
     X = np.array([d['input_vector'] for d in data], dtype=np.float32)
@@ -48,7 +53,7 @@ def inspect_normalization(model_key):
 
     # 3. Check a real recalibrated prediction: manually reproduce the DCN confidence
     #    using saved stats, compare against what apply_recalibration.py actually output
-    recal_path = f"D:/DentalCalib-Net/stage4_outputs/recalibrated_predictions/{model_key}_clean_recalibrated.json"
+    recal_path = project_path(f"stage4_outputs/recalibrated_predictions/{model_key}_clean_recalibrated.json")
     with open(recal_path) as f:
         recal_data = json.load(f)
 

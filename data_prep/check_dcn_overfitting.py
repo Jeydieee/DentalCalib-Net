@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 import numpy as np
 import torch
@@ -29,7 +34,7 @@ def normalize_features(X, feature_mean, feature_std):
 def evaluate_on_training_data(model_key):
     print(f"\n=== {model_key.upper()} ===")
 
-    checkpoint_path = f"D:/DentalCalib-Net/stage4_outputs/dentalcalib_net_models/dentalcalib_net_{model_key}.pt"
+    checkpoint_path = project_path(f"stage4_outputs/dentalcalib_net_models/dentalcalib_net_{model_key}.pt")
     checkpoint = torch.load(checkpoint_path, weights_only=False)
 
     model = DentalCalibNet()
@@ -39,7 +44,7 @@ def evaluate_on_training_data(model_key):
     feat_mean = checkpoint['feature_mean']
     feat_std = checkpoint['feature_std']
 
-    vectors_path = f"D:/DentalCalib-Net/stage4_outputs/training_vectors/{model_key}_val_vectors.json"
+    vectors_path = project_path(f"stage4_outputs/training_vectors/{model_key}_val_vectors.json")
     with open(vectors_path) as f:
         data = json.load(f)
 

@@ -1,4 +1,9 @@
-CSV_PATH = r"D:\DentalCalib-Net\stage5_outputs\nll_results.csv"
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
+CSV_PATH = project_path("stage5_outputs", "nll_results.csv")
 
 import csv
 import numpy as np

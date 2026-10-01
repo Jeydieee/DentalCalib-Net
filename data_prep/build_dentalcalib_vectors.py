@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 from pathlib import Path
 
@@ -61,9 +66,9 @@ def build_vectors(labeled_predictions_path, quality_features, quality_key, out_p
 
 
 if __name__ == "__main__":
-    LABELED_DIR = r"D:\DentalCalib-Net\stage4_outputs\labeled_predictions"
-    QUALITY_FEATURES_PATH = r"D:\DentalCalib-Net\data_prep\quality_features.json"
-    OUTPUT_DIR = r"D:\DentalCalib-Net\stage4_outputs\training_vectors"
+    LABELED_DIR = project_path("stage4_outputs", "labeled_predictions")
+    QUALITY_FEATURES_PATH = project_path("data_prep", "quality_features.json")
+    OUTPUT_DIR = project_path("stage4_outputs", "training_vectors")
 
     Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 

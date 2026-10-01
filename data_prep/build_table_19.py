@@ -1,4 +1,9 @@
-CSV_DIR = r"D:\DentalCalib-Net\stage4_outputs\quadrant_labeled_predictions"
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
+CSV_DIR = project_path("stage4_outputs", "quadrant_labeled_predictions")
 
 import json
 import numpy as np

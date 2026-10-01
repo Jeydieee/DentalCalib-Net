@@ -23,6 +23,12 @@
    ========================================================== */
 
 // ---------- Navigation ----------
+const DATA_ROOT = new URL(
+  document.currentScript?.dataset.dataRoot || "data/",
+  document.currentScript?.src || window.location.href
+);
+const dataUrl = path => new URL(path, DATA_ROOT);
+
 const navItems = document.querySelectorAll(".nav-item");
 const pages = document.querySelectorAll(".page");
 
@@ -97,7 +103,7 @@ let calibrationData = null;
 async function loadCalibrationData() {
   if (calibrationData) return calibrationData;
   try {
-    const res = await fetch("data/calibration_results.json");
+    const res = await fetch(dataUrl("calibration_results.json"));
     if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
     calibrationData = await res.json();
   } catch (err) {
@@ -120,7 +126,7 @@ let reliabilityBinData = null;
 async function loadReliabilityBins() {
   if (reliabilityBinData) return reliabilityBinData;
   try {
-    const res = await fetch("data/reliability_bins.json");
+    const res = await fetch(dataUrl("reliability_bins.json"));
     if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
     reliabilityBinData = await res.json();
   } catch (err) {
@@ -640,7 +646,7 @@ let nllData = null;
 async function loadNllData() {
   if (nllData) return nllData;
   try {
-    const res = await fetch("data/nll_results.json");
+    const res = await fetch(dataUrl("nll_results.json"));
     if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
     nllData = await res.json();
   } catch (err) {
@@ -704,7 +710,7 @@ async function loadPerImagePredictions(model, condition) {
   const cacheKey = `${model}__${condition}`;
   if (perImageCache[cacheKey]) return perImageCache[cacheKey];
   try {
-    const res = await fetch(`data/per_image/${cacheKey}.json`);
+    const res = await fetch(dataUrl(`per_image/${cacheKey}.json`));
     if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
     perImageCache[cacheKey] = await res.json();
   } catch (err) {

@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 from pathlib import Path
 
@@ -101,9 +106,9 @@ def process_prediction_file(pred_path, gt_by_filename, out_path):
 
 
 if __name__ == "__main__":
-    GT_PATH = r"D:/DentalCalib-Net/data_prep/repool_output/dentex_merged_1005_resized.json"
-    STAGE2_DIR = r"D:/DentalCalib-Net/stage2_outputs"
-    OUTPUT_DIR = r"D:/DentalCalib-Net/stage4_outputs/labeled_predictions"
+    GT_PATH = project_path("data_prep", "repool_output", "dentex_merged_1005_resized.json")
+    STAGE2_DIR = project_path("stage2_outputs")
+    OUTPUT_DIR = project_path("stage4_outputs", "labeled_predictions")
 
     Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 

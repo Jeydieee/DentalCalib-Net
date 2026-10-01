@@ -2,6 +2,7 @@ import json
 import re
 from pathlib import Path
 from collections import Counter
+from data_prep.paths import raw_data_path
 
 # Turkish diagnosis term -> DENTEX category_id_3
 DIAG_MAP = {
@@ -121,4 +122,4 @@ def convert_test_folder(test_dir, out_path='test_quadrant_enumeration_disease.js
     print(f"\nSaved -> {out_path}")
 
 if __name__ == "__main__":
-    convert_test_folder(test_dir="D:\\DENTEX 2023\\test_data\\disease\\label")
+    convert_test_folder(test_dir=raw_data_path("test_data", "disease", "label"))

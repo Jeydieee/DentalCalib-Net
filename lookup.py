@@ -1,11 +1,13 @@
+from data_prep.paths import project_path
+
 import json
 import pandas as pd
 
 def load_everything(
-    merged_path=r"D:/DentalCalib-Net/data_prep/repool_output/dentex_merged_1005.json",
-    train_csv=r"D:/DentalCalib-Net/data_prep/split_output/train_ids.csv",
-    val_csv=r"D:/DentalCalib-Net/data_prep/split_output/val_ids.csv",
-    test_csv=r"D:/DentalCalib-Net/data_prep/split_output/test_ids.csv",
+    merged_path=project_path("data_prep", "repool_output", "dentex_merged_1005.json"),
+    train_csv=project_path("data_prep", "split_output", "train_ids.csv"),
+    val_csv=project_path("data_prep", "split_output", "val_ids.csv"),
+    test_csv=project_path("data_prep", "split_output", "test_ids.csv"),
 ):
     with open(merged_path) as f:
         merged = json.load(f)

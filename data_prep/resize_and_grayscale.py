@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 import cv2
 import numpy as np
@@ -7,9 +12,9 @@ from pathlib import Path
 TARGET_SIZE = 640
 
 SOURCE_DIRS = [
-    r"D:/DENTEX 2023/training_data/quadrant-enumeration-disease/xrays",
-    r"D:/DENTEX 2023/validation_data/quadrant_enumeration_disease/xrays",
-    r"D:/DENTEX 2023/test_data/disease/input",
+    raw_data_path("training_data", "quadrant-enumeration-disease", "xrays"),
+    raw_data_path("validation_data", "quadrant-enumeration-disease", "xrays"),
+    raw_data_path("test_data", "disease", "input"),
 ]
 
 def find_source_image(file_name, source_dirs=SOURCE_DIRS):
@@ -113,22 +118,22 @@ def build_resized_json(merged, all_scale_factors, out_path='dentex_merged_1005_r
 
 
 if __name__ == "__main__":
-    with open(r"D:/DentalCalib-Net/data_prep/repool_output/dentex_merged_1005.json") as f:
+    with open(project_path("data_prep", "repool_output", "dentex_merged_1005.json")) as f:
         merged = json.load(f)
 
     images_by_id = {img['id']: img for img in merged['images']}
 
-    train_ids = pd.read_csv(r"D:/DentalCalib-Net/data_prep/split_output/train_ids.csv")['image_id'].tolist()
-    val_ids = pd.read_csv(r"D:/DentalCalib-Net/data_prep/split_output/val_ids.csv")['image_id'].tolist()
-    test_ids = pd.read_csv(r"D:/DentalCalib-Net/data_prep/split_output/test_ids.csv")['image_id'].tolist()
+    train_ids = pd.read_csv(project_path("data_prep", "split_output", "train_ids.csv"))['image_id'].tolist()
+    val_ids = pd.read_csv(project_path("data_prep", "split_output", "val_ids.csv"))['image_id'].tolist()
+    test_ids = pd.read_csv(project_path("data_prep", "split_output", "test_ids.csv"))['image_id'].tolist()
 
     all_scale_factors = {}
     all_scale_factors.update(process_partition(merged, images_by_id,
-        r"D:/DentalCalib-Net/dataset_split/train", train_ids))
+        project_path("dataset_split", "train"), train_ids))
     all_scale_factors.update(process_partition(merged, images_by_id,
-        r"D:/DentalCalib-Net/dataset_split/val", val_ids))
+        project_path("dataset_split", "val"), val_ids))
     all_scale_factors.update(process_partition(merged, images_by_id,
-        r"D:/DentalCalib-Net/dataset_split/test", test_ids))
+        project_path("dataset_split", "test"), test_ids))
 
     build_resized_json(merged, all_scale_factors,
-        out_path=r"D:/DentalCalib-Net/data_prep/repool_output/dentex_merged_1005_resized.json")
+        out_path=project_path("data_prep", "repool_output", "dentex_merged_1005_resized.json"))

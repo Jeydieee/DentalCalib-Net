@@ -1,6 +1,11 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(r"D:\DentalCalib-Net\data_prep")))
+sys.path.insert(0, str(Path(project_path("data_prep"))))
 
 import inspect
 from compute_map import greedy_match, compute_ap

@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 
 def verify_bbox_alignment(merged_path='dentex_merged_1005.json'):
@@ -47,4 +52,4 @@ def verify_bbox_alignment(merged_path='dentex_merged_1005.json'):
     return errors
 
 if __name__ == "__main__":
-    verify_bbox_alignment(r"D:/DentalCalib-Net/data_prep/repool_output/dentex_merged_1005_resized.json")
+    verify_bbox_alignment(project_path("data_prep", "repool_output", "dentex_merged_1005_resized.json"))

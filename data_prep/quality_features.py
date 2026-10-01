@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import cv2
 import numpy as np
 from pathlib import Path
@@ -65,10 +70,10 @@ def extract_quality_features(img_path):
 
 
 if __name__ == "__main__":
-    clean_path = r"D:/DentalCalib-Net/dataset_split/test/test_0.png"
-    blur_s5_path = r"D:/DentalCalib-Net/dataset_split/ood/motion_blur/S5/test_0.png"
-    noise_s5_path = r"D:/DentalCalib-Net/dataset_split/ood/gaussian_noise/S5/test_0.png"
-    jpeg_s5_path = r"D:/DentalCalib-Net/dataset_split/ood/jpeg_compression/S5/test_0.png"
+    clean_path = project_path("dataset_split", "test", "test_0.png")
+    blur_s5_path = project_path("dataset_split", "ood", "motion_blur", "S5", "test_0.png")
+    noise_s5_path = project_path("dataset_split", "ood", "gaussian_noise", "S5", "test_0.png")
+    jpeg_s5_path = project_path("dataset_split", "ood", "jpeg_compression", "S5", "test_0.png")
 
     print("Clean:", extract_quality_features(clean_path))
     print("Motion blur S5:", extract_quality_features(blur_s5_path))

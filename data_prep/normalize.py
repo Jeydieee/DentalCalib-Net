@@ -1,6 +1,10 @@
 import cv2
 import numpy as np
 from pathlib import Path
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
 
 
 def load_and_normalize(img_path):
@@ -44,4 +48,4 @@ def verify_normalization(img_path):
 
 if __name__ == "__main__":
     # spot-check against one real resized image from your dataset_split folder
-    verify_normalization(r"D:/DentalCalib-Net/dataset_split/train/train_5.png")
+    verify_normalization(project_path("dataset_split", "train", "train_5.png"))

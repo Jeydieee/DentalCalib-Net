@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 from pathlib import Path
 
@@ -29,8 +34,8 @@ def process_and_filter(pred_path, out_path, k=50):
 
 
 if __name__ == "__main__":
-    STAGE2_DIR = r"D:/DentalCalib-Net/stage2_outputs"
-    OUTPUT_DIR = r"D:/DentalCalib-Net/stage4_outputs/rtdetr_filtered"
+    STAGE2_DIR = project_path("stage2_outputs")
+    OUTPUT_DIR = project_path("stage4_outputs", "rtdetr_filtered")
     K = 50
 
     Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)

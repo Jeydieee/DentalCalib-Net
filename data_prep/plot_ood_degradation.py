@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 import numpy as np
 import matplotlib.pyplot as plt
@@ -109,9 +114,9 @@ def plot_full_degradation(calibration_data, model, confidence_type, rho, signifi
 
 
 if __name__ == "__main__":
-    CALIBRATION_RESULTS_PATH = r"D:\DentalCalib-Net\stage5_outputs\calibration_results.json"
-    STAT_TESTS_PATH = r"D:\DentalCalib-Net\stage5_outputs\statistical_tests.json"
-    OUTPUT_DIR = r"D:\DentalCalib-Net\stage5_outputs\ood_degradation_plots"
+    CALIBRATION_RESULTS_PATH = project_path("stage5_outputs", "calibration_results.json")
+    STAT_TESTS_PATH = project_path("stage5_outputs", "statistical_tests.json")
+    OUTPUT_DIR = project_path("stage5_outputs", "ood_degradation_plots")
 
     Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 

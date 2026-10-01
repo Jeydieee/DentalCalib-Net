@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 import numpy as np
 import matplotlib.pyplot as plt
@@ -161,9 +166,9 @@ def generate_all_reliability_diagrams(recalibrated_dir, labeled_dir, output_dir)
 
 
 if __name__ == "__main__":
-    RECALIBRATED_DIR = r"D:\DentalCalib-Net\stage4_outputs\recalibrated_predictions"
-    LABELED_DIR = r"D:\DentalCalib-Net\stage4_outputs\labeled_predictions"
-    OUTPUT_DIR = r"D:\DentalCalib-Net\stage5_outputs\reliability_diagrams"
+    RECALIBRATED_DIR = project_path("stage4_outputs", "recalibrated_predictions")
+    LABELED_DIR = project_path("stage4_outputs", "labeled_predictions")
+    OUTPUT_DIR = project_path("stage5_outputs", "reliability_diagrams")
 
     generate_all_reliability_diagrams(RECALIBRATED_DIR, LABELED_DIR, OUTPUT_DIR)
     print("\nDone.")

@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import cv2
 import numpy as np
 import json
@@ -59,10 +64,10 @@ def extract_quality_features(img_path):
 
 # ── Batch extraction ─────────────────────────────────────────────────
 
-VAL_DIR = r"D:/DentalCalib-Net/dataset_split/val"
-TEST_DIR = r"D:/DentalCalib-Net/dataset_split/test"
-OOD_BASE = r"D:/DentalCalib-Net/dataset_split/ood"
-OUTPUT_PATH = r"D:/DentalCalib-Net/data_prep/quality_features.json"
+VAL_DIR = project_path("dataset_split", "val")
+TEST_DIR = project_path("dataset_split", "test")
+OOD_BASE = project_path("dataset_split", "ood")
+OUTPUT_PATH = project_path("data_prep", "quality_features.json")
 
 CORRUPTION_TYPES = ['gaussian_noise', 'motion_blur', 'brightness_variation', 'jpeg_compression']
 SEVERITIES = ['S1', 'S2', 'S3', 'S4', 'S5']

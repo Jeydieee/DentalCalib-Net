@@ -1,9 +1,14 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 import numpy as np
 from pathlib import Path
 
-GT_PATH = r"D:\DentalCalib-Net\data_prep\repool_output\dentex_merged_1005_resized.json"
-YOLOV8_OOD_DIR = r"D:\DentalCalib-Net\stage2_outputs\yolov8_ood_predictions"
+GT_PATH = project_path("data_prep", "repool_output", "dentex_merged_1005_resized.json")
+YOLOV8_OOD_DIR = project_path("stage2_outputs", "yolov8_ood_predictions")
 
 IMAGE_SIZE = 640
 BORDER_MARGIN = 20  # pixels from any edge to count as "border"
@@ -158,7 +163,7 @@ if __name__ == "__main__":
               if avg_d is not None else "  Avg. distance: N/A (no predictions or no ground truth)")
         print()
 
-    output_path = r"D:\DentalCalib-Net\stage4_outputs\gaussian_noise_border_analysis_yolov8.json"
+    output_path = project_path("stage4_outputs", "gaussian_noise_border_analysis_yolov8.json")
     with open(output_path, 'w') as f:
         json.dump(results, f, indent=2)
     print(f"Saved full results -> {output_path}")

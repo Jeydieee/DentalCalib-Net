@@ -1,3 +1,8 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import json
 import numpy as np
 import torch
@@ -112,12 +117,12 @@ def apply_recalibration_to_condition(
 
 
 if __name__ == "__main__":
-    STAGE2_DIR = r"D:\DentalCalib-Net\stage2_outputs"
-    FILTERED_DIR = r"D:\DentalCalib-Net\stage4_outputs\rtdetr_filtered"
-    QUALITY_FEATURES_PATH = r"D:\DentalCalib-Net\data_prep\quality_features.json"
-    TS_PARAMS_PATH = r"D:\DentalCalib-Net\stage4_outputs\temperature_scaling_params.json"
-    DCN_MODELS_DIR = r"D:\DentalCalib-Net\stage4_outputs\dentalcalib_net_models"
-    OUTPUT_DIR = r"D:\DentalCalib-Net\stage4_outputs\recalibrated_predictions"
+    STAGE2_DIR = project_path("stage2_outputs")
+    FILTERED_DIR = project_path("stage4_outputs", "rtdetr_filtered")
+    QUALITY_FEATURES_PATH = project_path("data_prep", "quality_features.json")
+    TS_PARAMS_PATH = project_path("stage4_outputs", "temperature_scaling_params.json")
+    DCN_MODELS_DIR = project_path("stage4_outputs", "dentalcalib_net_models")
+    OUTPUT_DIR = project_path("stage4_outputs", "recalibrated_predictions")
 
     Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 

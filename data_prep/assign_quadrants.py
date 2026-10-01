@@ -1,5 +1,9 @@
 import json
 from pathlib import Path
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
 
 def assign_quadrant(bbox_xyxy, img_width=640, img_height=640):
     """
@@ -89,9 +93,9 @@ def build_quadrant_labeled_file(labeled_path, recal_path, out_path):
 
 
 if __name__ == "__main__":
-    LABELED_DIR = r"D:\DentalCalib-Net\stage4_outputs\labeled_predictions"
-    RECAL_DIR = r"D:\DentalCalib-Net\stage4_outputs\recalibrated_predictions"
-    OUTPUT_DIR = r"D:\DentalCalib-Net\stage4_outputs\quadrant_labeled_predictions"
+    LABELED_DIR = project_path("stage4_outputs", "labeled_predictions")
+    RECAL_DIR = project_path("stage4_outputs", "recalibrated_predictions")
+    OUTPUT_DIR = project_path("stage4_outputs", "quadrant_labeled_predictions")
 
     Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 

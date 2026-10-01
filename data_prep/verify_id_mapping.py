@@ -1,5 +1,10 @@
-REPOOL_JSON = r"D:\DentalCalib-Net\data_prep\repool_output\dentex_merged_1005_resized.json"
-TEST_IDS_CSV = r"D:\DentalCalib-Net\data_prep\split_output\test_ids.csv"
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
+REPOOL_JSON = project_path("data_prep", "repool_output", "dentex_merged_1005_resized.json")
+TEST_IDS_CSV = project_path("data_prep", "split_output", "test_ids.csv")
 
 import json
 import csv

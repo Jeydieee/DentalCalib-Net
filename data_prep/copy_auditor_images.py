@@ -1,7 +1,12 @@
-REPOOL_JSON = r"D:\DentalCalib-Net\data_prep\repool_output\dentex_merged_1005_resized.json"
-TEST_IDS_CSV = r"D:\DentalCalib-Net\data_prep\split_output\test_ids.csv"
-DATASET_SPLIT_DIR = r"D:\DentalCalib-Net\dataset_split"
-OUT_DIR = r"D:\DentalCalib-Net\frontend\images"
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
+REPOOL_JSON = project_path("data_prep", "repool_output", "dentex_merged_1005_resized.json")
+TEST_IDS_CSV = project_path("data_prep", "split_output", "test_ids.csv")
+DATASET_SPLIT_DIR = project_path("dataset_split")
+OUT_DIR = project_path("frontend", "images")
 
 import json
 import csv

@@ -1,7 +1,12 @@
+try:
+    from .paths import project_path, raw_data_path
+except ImportError:
+    from paths import project_path, raw_data_path
+
 import csv
 import numpy as np
 
-CSV_PATH = r"D:\DentalCalib-Net\stage5_outputs\calibration_results.csv"
+CSV_PATH = project_path("stage5_outputs", "calibration_results.csv")
 
 with open(CSV_PATH) as f:
     rows = list(csv.DictReader(f))

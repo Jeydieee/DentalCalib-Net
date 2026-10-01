@@ -2,6 +2,7 @@ import json
 import re
 from pathlib import Path
 from collections import Counter
+from data_prep.paths import raw_data_path
 
 def parse_label(label):
     """'1-çürük-27' -> diagnosis term + FDI tooth number"""
@@ -47,4 +48,4 @@ def scan_vocabulary(test_dir):
     return term_counts
 
 if __name__ == "__main__":
-    scan_vocabulary(test_dir="D:\\DENTEX 2023\\test_data\\disease\\label")
+    scan_vocabulary(test_dir=raw_data_path("test_data", "disease", "label"))
