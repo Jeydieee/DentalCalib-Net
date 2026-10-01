@@ -686,12 +686,22 @@ fileInput.addEventListener("change", e => {
 let selectedFilename = null;
 
 async function handleUploadedFile(file) {
-  await loadTestImageList();
+  try {
+    await loadTestImageList();
+  } catch (error) {
+    selectedFilename = null;
+    resetAuditorResults();
+    console.error("Auditor data is unavailable:", error);
+    document.getElementById("upload-status").textContent =
+      "Auditor data is missing. Copy frontend/data and frontend/images from the shared dataset, then open this page over HTTP.";
+    return;
+  }
+
   if (!testImageList.includes(file.name)) {
-    alert(
-      `"${file.name}" is not part of the 201-image DENTEX test partition this benchmark was computed on.\n\n` +
-      `Only images actually run through YOLOv8/RT-DETR during this study have precomputed results.`
-    );
+    selectedFilename = null;
+    resetAuditorResults();
+    document.getElementById("upload-status").textContent =
+      `No saved results for "${file.name}". Use an image from the 201-image DENTEX test set with its original filename.`;
     return;
   }
   selectedFilename = file.name;
@@ -723,26 +733,26 @@ function resetAuditorResults() {
 // ---------- Page 1: Live OPG Auditor (REAL per-image data) ----------
 let perImageCache = {};
 let testImageList = null;
+let testImageListPromise = null;
 
 async function loadPerImagePredictions(model, condition) {
   const cacheKey = `${model}__${condition}`;
-  if (perImageCache[cacheKey]) return perImageCache[cacheKey];
-  try {
-    const res = await fetch(dataUrl(`per_image/${cacheKey}.json`));
-    if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
-    perImageCache[cacheKey] = await res.json();
-  } catch (err) {
-    console.error(`Failed to load per_image/${cacheKey}.json:`, err);
-    perImageCache[cacheKey] = {};
-  }
+  if (cacheKey in perImageCache) return perImageCache[cacheKey];
+  const res = await fetch(dataUrl(`per_image/${cacheKey}.json`));
+  if (!res.ok) throw new Error(`Missing per_image/${cacheKey}.json (HTTP ${res.status})`);
+  perImageCache[cacheKey] = await res.json();
   return perImageCache[cacheKey];
 }
 
-async function loadTestImageList() {
-  if (testImageList) return testImageList;
-  const clean = await loadPerImagePredictions("yolov8", "clean");
-  testImageList = Object.keys(clean).sort();
-  return testImageList;
+function loadTestImageList() {
+  if (!testImageListPromise) {
+    testImageListPromise = loadPerImagePredictions("yolov8", "clean").then(clean => {
+      testImageList = Object.keys(clean).sort();
+      if (!testImageList.length) throw new Error("The clean YOLOv8 per-image data is empty.");
+      return testImageList;
+    });
+  }
+  return testImageListPromise;
 }
 
 function drawImageWithBoxes(canvasId, imagePath, predictions, threshold, confField) {
@@ -939,12 +949,20 @@ document.getElementById("runInference")?.addEventListener("click", () => {
   const originalText = btn.textContent;
   btn.textContent = "Loading…";
   btn.disabled = true;
-  runAuditorInference().finally(() => {
+  runAuditorInference().catch(error => {
+    console.error("Auditor results could not be loaded:", error);
+    document.getElementById("upload-status").textContent =
+      `Could not load the selected condition's saved results: ${error.message}`;
+  }).finally(() => {
     btn.textContent = originalText;
     btn.disabled = false;
     document.querySelector(".card-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 });
 
-loadTestImageList();
+loadTestImageList().catch(error => {
+  console.error("Auditor data is unavailable:", error);
+  document.getElementById("upload-status").textContent =
+    "Auditor data is missing. Copy frontend/data and frontend/images from the shared dataset, then open this page over HTTP.";
+});
 setupImageModal();

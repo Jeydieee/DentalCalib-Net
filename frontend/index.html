@@ -53,8 +53,8 @@
           <header class="page-head">
             <h1>Live OPG Auditor</h1>
             <p>
-              Upload a panoramic dental radiograph and run live calibration
-              inference on both models.
+              Choose a supported DENTEX test image to view its stored YOLOv8 and
+              RT-DETR predictions for the selected condition.
             </p>
           </header>
 
@@ -75,7 +75,8 @@
             <span class="sim-chip">REAL DATA</span>
             Only images from the 201-image DENTEX test partition have
             precomputed results. Uploading any other image will show an error
-            rather than fabricated numbers. ECE and MCE are calculated from the
+            rather than fabricated numbers. This page does not run model
+            inference on arbitrary uploads. ECE and MCE are calculated from the
             selected image's detections; D-ECE requires per-detection IoU, which
             is not included in these image records.
           </div>
@@ -103,7 +104,7 @@
                 <option>DentalCalib-Net</option>
               </select>
             </label>
-            <button class="btn-primary" id="runInference">Run inference</button>
+            <button class="btn-primary" id="runInference">Show results</button>
           </div>
 
           <!-- YOLOv8 row: image | data | graph -->
