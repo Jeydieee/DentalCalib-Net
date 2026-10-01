@@ -696,10 +696,28 @@ async function handleUploadedFile(file) {
   }
   selectedFilename = file.name;
   document.getElementById("upload-status").textContent = `✓ Uploaded: ${file.name}`;
-  document.querySelectorAll(".opg-preview .placeholder").forEach(p => (p.style.display = "none"));
-  // Inference no longer runs automatically here -- the user sets OOD
-  // condition/severity/recalibration next, then explicitly clicks
-  // "Run inference" to populate results and trigger the scroll below.
+  resetAuditorResults();
+}
+
+function resetAuditorResults() {
+  ["canvas-yolo", "canvas-rtdetr"].forEach(id => {
+    const canvas = document.getElementById(id);
+    canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+  });
+  document.querySelectorAll(".opg-preview .placeholder").forEach(p => (p.style.display = ""));
+
+  [
+    "yolo-ece", "yolo-mce", "yolo-dece", "rtdetr-ece", "rtdetr-mce", "rtdetr-dece",
+    "s1-yolo", "s1-rt", "s2-yolo", "s2-rt", "s3-yolo", "s3-rt",
+    "s1-delta", "s2-delta", "s3-delta", "yolo-chart-note", "rtdetr-chart-note",
+  ].forEach(id => {
+    const element = document.getElementById(id);
+    element.textContent = "—";
+    element.className = element.className.replace(/\s(good|bad)\b/g, "");
+  });
+
+  reliabilityChart("chart-rel-yolo", [], "#C4501E");
+  reliabilityChart("chart-rel-rtdetr", [], "#2F7D4F");
 }
 
 // ---------- Page 1: Live OPG Auditor (REAL per-image data) ----------
@@ -799,7 +817,7 @@ function auditorRecalMethod(label) {
 }
 
 function calibrationInterpretation(binEntry) {
-  if (!binEntry) return { text: "No data for this condition", cls: "" };
+  if (!binEntry?.confidence.length) return { text: "No detections for this image", cls: "" };
   const gaps = binEntry.confidence.map((c, i) => c - binEntry.accuracy[i]);
   const meanGap = gaps.reduce((s, g) => s + g, 0) / gaps.length;
   const maxGap = Math.max(...gaps.map(Math.abs));
@@ -811,16 +829,57 @@ function calibrationInterpretation(binEntry) {
 }
 
 function betterModelDelta(yoloVal, rtVal, label) {
+  if (!Number.isFinite(yoloVal) || !Number.isFinite(rtVal)) {
+    return { text: `${label} unavailable per image`, cls: "" };
+  }
   const diff = rtVal - yoloVal;
   const better = diff < 0 ? "RT-DETR" : diff > 0 ? "YOLOv8" : null;
   if (better === null) return { text: `Tied (${label})`, cls: "" };
   return { text: `${better} ${diff.toFixed(3)} better`, cls: "good" };
 }
 
+function summarizeImagePredictions(predictions, confidenceField, nBins = 15) {
+  const counts = Array(nBins).fill(0);
+  const confidenceSums = Array(nBins).fill(0);
+  const labelSums = Array(nBins).fill(0);
+  let total = 0;
+
+  predictions.forEach(prediction => {
+    const confidence = Number(prediction[confidenceField]);
+    const label = Number(prediction.label);
+    if (!Number.isFinite(confidence) || ![0, 1].includes(label)) return;
+
+    const bin = Math.min(nBins - 1, Math.max(0, Math.ceil(confidence * nBins) - 1));
+    counts[bin] += 1;
+    confidenceSums[bin] += confidence;
+    labelSums[bin] += label;
+    total += 1;
+  });
+
+  if (!total) return { ece: null, mce: null, bins: { confidence: [], accuracy: [] } };
+
+  const populated = counts.map((count, index) => ({ count, index })).filter(bin => bin.count > 0);
+  const gaps = populated.map(({ count, index }) => {
+    const confidence = confidenceSums[index] / count;
+    const accuracy = labelSums[index] / count;
+    return { confidence, accuracy, gap: Math.abs(accuracy - confidence), weight: count / total };
+  });
+
+  return {
+    ece: gaps.reduce((sum, bin) => sum + bin.weight * bin.gap, 0),
+    mce: Math.max(...gaps.map(bin => bin.gap)),
+    bins: {
+      confidence: gaps.map(bin => bin.confidence),
+      accuracy: gaps.map(bin => bin.accuracy),
+    },
+  };
+}
+
 async function runAuditorInference() {
-  await Promise.all([loadCalibrationData(), loadReliabilityBins(), loadTestImageList()]);
+  await loadTestImageList();
 
   if (!selectedFilename) return; // nothing uploaded yet
+  document.querySelectorAll(".opg-preview .placeholder").forEach(p => (p.style.display = "none"));
   const filename = selectedFilename;
   const condLabel = document.getElementById("oodCondition").value;
   const severity = document.getElementById("severity").value;
@@ -829,32 +888,29 @@ async function runAuditorInference() {
   const method = auditorRecalMethod(recalLabel);
   const imagePath = auditorImagePath(condition, filename);
 
-  const yoloRow = calibrationData.find(r => r.model === "yolov8" && r.condition === condition && r.confidence_type === method);
-  const rtRow = calibrationData.find(r => r.model === "rtdetr" && r.condition === condition && r.confidence_type === method);
-  const yoloBins = lookupBins("yolov8", condition, method);
-  const rtBins = lookupBins("rtdetr", condition, method);
+  const confField = { raw: "confidence_raw", ts: "confidence_ts", dcn: "confidence_dcn" }[method];
+  const yoloPreds = (await loadPerImagePredictions("yolov8", condition))[filename] || [];
+  const rtPreds = (await loadPerImagePredictions("rtdetr", condition))[filename] || [];
+  const yoloMetrics = summarizeImagePredictions(yoloPreds, confField);
+  const rtMetrics = summarizeImagePredictions(rtPreds, confField);
+  const showMetric = value => value == null ? "—" : fmt(value);
 
-  if (!yoloRow || !rtRow) {
-    console.warn(`No aggregate data for condition=${condition} method=${method}`);
-    return;
-  }
+  document.getElementById("yolo-ece").textContent = showMetric(yoloMetrics.ece);
+  document.getElementById("yolo-mce").textContent = showMetric(yoloMetrics.mce);
+  document.getElementById("yolo-dece").textContent = "N/A";
+  document.getElementById("rtdetr-ece").textContent = showMetric(rtMetrics.ece);
+  document.getElementById("rtdetr-mce").textContent = showMetric(rtMetrics.mce);
+  document.getElementById("rtdetr-dece").textContent = "N/A";
+  document.getElementById("s1-yolo").textContent = showMetric(yoloMetrics.ece);
+  document.getElementById("s1-rt").textContent = showMetric(rtMetrics.ece);
+  document.getElementById("s2-yolo").textContent = showMetric(yoloMetrics.mce);
+  document.getElementById("s2-rt").textContent = showMetric(rtMetrics.mce);
+  document.getElementById("s3-yolo").textContent = "N/A";
+  document.getElementById("s3-rt").textContent = "N/A";
 
-  document.getElementById("yolo-ece").textContent = fmt(yoloRow.ece);
-  document.getElementById("yolo-mce").textContent = fmt(yoloRow.mce);
-  document.getElementById("yolo-dece").textContent = fmt(yoloRow.dece);
-  document.getElementById("rtdetr-ece").textContent = fmt(rtRow.ece);
-  document.getElementById("rtdetr-mce").textContent = fmt(rtRow.mce);
-  document.getElementById("rtdetr-dece").textContent = fmt(rtRow.dece);
-  document.getElementById("s1-yolo").textContent = fmt(yoloRow.ece);
-  document.getElementById("s1-rt").textContent = fmt(rtRow.ece);
-  document.getElementById("s2-yolo").textContent = fmt(yoloRow.mce);
-  document.getElementById("s2-rt").textContent = fmt(rtRow.mce);
-  document.getElementById("s3-yolo").textContent = fmt(yoloRow.dece);
-  document.getElementById("s3-rt").textContent = fmt(rtRow.dece);
-
-  const eceDelta = betterModelDelta(yoloRow.ece, rtRow.ece, "ECE");
-  const mceDelta = betterModelDelta(yoloRow.mce, rtRow.mce, "MCE");
-  const deceDelta = betterModelDelta(yoloRow.dece, rtRow.dece, "D-ECE");
+  const eceDelta = betterModelDelta(yoloMetrics.ece, rtMetrics.ece, "ECE");
+  const mceDelta = betterModelDelta(yoloMetrics.mce, rtMetrics.mce, "MCE");
+  const deceDelta = betterModelDelta(null, null, "D-ECE");
   document.getElementById("s1-delta").textContent = eceDelta.text;
   document.getElementById("s1-delta").className = `stat-delta ${eceDelta.cls}`;
   document.getElementById("s2-delta").textContent = mceDelta.text;
@@ -862,11 +918,11 @@ async function runAuditorInference() {
   document.getElementById("s3-delta").textContent = deceDelta.text;
   document.getElementById("s3-delta").className = `stat-delta ${deceDelta.cls}`;
 
-  reliabilityChart("chart-rel-yolo", binsToChartPoints(yoloBins), "#C4501E");
-  reliabilityChart("chart-rel-rtdetr", binsToChartPoints(rtBins), "#2F7D4F");
+  reliabilityChart("chart-rel-yolo", binsToChartPoints(yoloMetrics.bins), "#C4501E");
+  reliabilityChart("chart-rel-rtdetr", binsToChartPoints(rtMetrics.bins), "#2F7D4F");
 
-  const yoloNote = calibrationInterpretation(yoloBins);
-  const rtNote = calibrationInterpretation(rtBins);
+  const yoloNote = calibrationInterpretation(yoloMetrics.bins);
+  const rtNote = calibrationInterpretation(rtMetrics.bins);
   const yoloNoteEl = document.getElementById("yolo-chart-note");
   const rtNoteEl = document.getElementById("rtdetr-chart-note");
   yoloNoteEl.textContent = yoloNote.text;
@@ -874,9 +930,6 @@ async function runAuditorInference() {
   rtNoteEl.textContent = rtNote.text;
   rtNoteEl.className = `chart-note ${rtNote.cls}`;
 
-  const confField = { raw: "confidence_raw", ts: "confidence_ts", dcn: "confidence_dcn" }[method];
-  const yoloPreds = (await loadPerImagePredictions("yolov8", condition))[filename] || [];
-  const rtPreds = (await loadPerImagePredictions("rtdetr", condition))[filename] || [];
   drawImageWithBoxes("canvas-yolo", imagePath, yoloPreds, 0.1, confField);
   drawImageWithBoxes("canvas-rtdetr", imagePath, rtPreds, 0.1, confField);
 }

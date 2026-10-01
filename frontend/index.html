@@ -75,7 +75,9 @@
             <span class="sim-chip">REAL DATA</span>
             Only images from the 201-image DENTEX test partition have
             precomputed results. Uploading any other image will show an error
-            rather than fabricated numbers.
+            rather than fabricated numbers. ECE and MCE are calculated from the
+            selected image's detections; D-ECE requires per-detection IoU, which
+            is not included in these image records.
           </div>
 
           <div class="controls-row">
