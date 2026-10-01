@@ -346,6 +346,19 @@ body {
 }
 .toggle-opt.active { background: var(--primary); color: #fff; }
 
+.field .toggle {
+  height: 32px;
+}
+
+.field .toggle-opt {
+  padding: 0 16px;
+  font-size: 13px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* ===== Table ===== */
 .table-card { padding: 0; overflow-x: auto; }
 
@@ -353,11 +366,14 @@ table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 
 th {
   text-align: left;
-  font-weight: 600;
-  color: var(--ink-soft);
+  font-weight: 700;
+  color: var(--ink);
   font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
+  background: #F0EEE7;
+  border-bottom: 2px solid var(--border);
   white-space: nowrap;
 }
 
@@ -489,4 +505,66 @@ button:focus-visible, select:focus-visible, input:focus-visible {
   display: flex; align-items: center; justify-content: center;
 }
 /* ===== OOD page: mid-size chart that scales with window height ===== */
-.deg-chart-wrap { position: relative; width: 100%; height: clamp(220px, 34vh, 320px); }
+.deg-chart-wrap {
+  position: relative;
+  width: 100%;
+  height: clamp(320px, 55vh, 600px);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.deg-chart-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ===== Benchmark Explorer: scrollable results table ===== */
+.table-card:has(#results-table) {
+  max-height: 450px;
+  overflow-y: auto;
+}
+
+.table-card:has(#results-table) thead th {
+  position: sticky;
+  top: 0;
+  background: #F0EEE7;
+  z-index: 1;
+}
+
+/* ===== Live OPG: click-to-enlarge image modal ===== */
+.image-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+
+.image-modal.active {
+  display: flex;
+}
+
+.image-modal img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: var(--radius);
+}
+
+.image-modal-close {
+  position: absolute;
+  top: 20px;
+  right: 32px;
+  color: #fff;
+  font-size: 32px;
+  cursor: pointer;
+}
+
+.opg-preview canvas {
+  cursor: zoom-in;
+}

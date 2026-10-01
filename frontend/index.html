@@ -38,13 +38,6 @@
 
   <!-- ============ MAIN ============ -->
   <main class="main">
-    <div class="demo-banner">
-      <strong>Simulated data.</strong> No trained model is connected. Every chart, table, and
-      inference result on this page is generated with <code>Math.random()</code> in
-      <code>script.js</code> — none of it comes from an actual YOLOv8 / RT-DETR run or from the
-      thesis results (Chapters 4's result tables are not yet filled in). Do not present these
-      numbers as findings.
-    </div>
 
     <!-- PAGE 1: LIVE OPG AUDITOR -->
 <section class="page active" id="page-auditor">
@@ -58,6 +51,7 @@
     <div class="upload-icon">+</div>
     <div class="upload-title">Upload a panoramic dental radiograph</div>
     <div class="upload-sub">JPG or PNG · must be from the DENTEX 2023 test set</div>
+    <div class="upload-sub" id="upload-status" style="margin-top:8px;font-weight:600;color:var(--primary);"></div>
   </div>
   <div class="sim-note">
     <span class="sim-chip">REAL DATA</span>
@@ -78,7 +72,7 @@
     </label>
     <label class="field">
       <span>Severity (1–5)</span>
-      <input type="range" min="1" max="5" value="3" id="severity">
+      <input type="range" min="1" max="5" value="1" id="severity">
     </label>
     <label class="field">
       <span>Recalibration</span>
@@ -100,9 +94,9 @@
         <span class="placeholder">OPG image</span>
       </div>
       <div class="model-metrics">
-        <div class="metric-item"><span>ECE</span><b id="yolo-ece">0.142</b></div>
-        <div class="metric-item"><span>MCE</span><b id="yolo-mce">0.261</b></div>
-        <div class="metric-item"><span>D-ECE</span><b id="yolo-dece">0.189</b></div>
+        <div class="metric-item"><span>ECE</span><b id="yolo-ece">—</b></div>
+        <div class="metric-item"><span>MCE</span><b id="yolo-mce">—</b></div>
+        <div class="metric-item"><span>D-ECE</span><b id="yolo-dece">—</b></div>
       </div>
       <div class="model-chart">
         <div class="chart-label">Reliability diagram</div>
@@ -121,9 +115,9 @@
         <span class="placeholder">OPG image</span>
       </div>
       <div class="model-metrics">
-        <div class="metric-item"><span>ECE</span><b id="rtdetr-ece">0.097</b></div>
-        <div class="metric-item"><span>MCE</span><b id="rtdetr-mce">0.183</b></div>
-        <div class="metric-item"><span>D-ECE</span><b id="rtdetr-dece">0.134</b></div>
+        <div class="metric-item"><span>ECE</span><b id="rtdetr-ece">—</b></div>
+        <div class="metric-item"><span>MCE</span><b id="rtdetr-mce">—</b></div>
+        <div class="metric-item"><span>D-ECE</span><b id="rtdetr-dece">—</b></div>
       </div>
       <div class="model-chart">
         <div class="chart-label">Reliability diagram</div>
@@ -136,17 +130,17 @@
   <div class="grid-3 stat-strip">
     <div class="card stat-card">
       <div class="stat-label">Expected Calibration Error (ECE)</div>
-      <div class="stat-pair"><span>YOLOv8 <b id="s1-yolo">0.142</b></span><span>RT-DETR <b id="s1-rt">0.097</b></span></div>
+      <div class="stat-pair"><span>YOLOv8 <b id="s1-yolo">—</b></span><span>RT-DETR <b id="s1-rt">—</b></span></div>
       <div class="stat-delta" id="s1-delta">—</div>
     </div>
     <div class="card stat-card">
       <div class="stat-label">Max Calibration Error (MCE)</div>
-      <div class="stat-pair"><span>YOLOv8 <b id="s2-yolo">0.261</b></span><span>RT-DETR <b id="s2-rt">0.183</b></span></div>
+      <div class="stat-pair"><span>YOLOv8 <b id="s2-yolo">—</b></span><span>RT-DETR <b id="s2-rt">—</b></span></div>
       <div class="stat-delta" id="s2-delta">—</div>
     </div>
     <div class="card stat-card">
       <div class="stat-label">Detection Calib. Error (D-ECE)</div>
-      <div class="stat-pair"><span>YOLOv8 <b id="s3-yolo">0.189</b></span><span>RT-DETR <b id="s3-rt">0.134</b></span></div>
+      <div class="stat-pair"><span>YOLOv8 <b id="s3-yolo">—</b></span><span>RT-DETR <b id="s3-rt">—</b></span></div>
       <div class="stat-delta" id="s3-delta">—</div>
     </div>
   </div>
@@ -167,7 +161,7 @@
           <select id="f-source"><option>All sources</option><option>DENTEX-C</option><option>Dental-OOD</option></select>
         </label>
         <label class="field"><span>Corruption type</span>
-          <select id="f-corruption"><option>All types</option><option>Gaussian noise</option><option>Motion blur</option><option>JPEG compression</option></select>
+          <select id="f-corruption"><option>All types</option><option>Gaussian noise</option><option>Motion blur</option><option>Brightness variation</option><option>JPEG compression</option></select>
         </label>
         <label class="field"><span>Severity</span>
           <select id="f-severity"><option>All</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
@@ -227,18 +221,14 @@
           <select id="rv-model"><option>YOLOv8</option><option>RT-DETR</option></select>
         </label>
         <label class="field"><span>OOD condition</span>
-          <select id="rv-condition"><option>Gaussian noise</option><option>Motion blur</option><option>JPEG compression</option></select>
+          <select id="rv-condition"><option>Gaussian noise</option><option>Motion blur</option><option>Brightness variation</option><option>JPEG compression</option></select>
         </label>
         <label class="field"><span>Severity</span>
           <select id="rv-severity"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
         </label>
-        <div class="toggle-group">
-          <span>Recalibration</span>
-          <div class="toggle" id="rv-toggle">
-            <button class="toggle-opt active" data-mode="pre">Pre</button>
-            <button class="toggle-opt" data-mode="post">Post</button>
-          </div>
-        </div>
+        <label class="field"><span>Recalibration method</span>
+          <select id="rv-method"><option>Temperature scaling</option><option>DentalCalib-Net</option></select>
+        </label>
       </div>
 
       <div class="grid-2">
@@ -252,7 +242,7 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-title">DentalCalib-Net — after recalibration</div>
+          <div class="card-title" id="rv-recal-title">DentalCalib-Net — after recalibration</div>
           <canvas id="chart-rv-recal" height="180"></canvas>
           <div class="chart-metrics">
             <span>ECE <b id="rv-recal-ece">0.071</b></span>
@@ -276,13 +266,19 @@
 
       <div class="card filter-bar">
         <label class="field"><span>Model</span>
-          <select id="deg-model"><option>YOLOv8</option><option>RT-DETR</option><option>Both</option></select>
+          <select id="deg-model"><option>Both</option><option>YOLOv8</option><option>RT-DETR</option></select>
         </label>
         <label class="field"><span>OOD source</span>
           <select id="deg-source"><option>DENTEX-C</option><option>Dental-OOD</option></select>
         </label>
         <label class="field"><span>Corruption type</span>
-          <select id="deg-corruption"><option>Gaussian noise</option><option>Motion blur</option><option>JPEG compression</option></select>
+          <select id="deg-corruption"><option>Gaussian noise</option><option>Motion blur</option><option>Brightness variation</option><option>JPEG compression</option></select>
+        </label>
+        <label class="field"><span>Recalibration</span>
+          <div class="toggle" id="deg-recalib-toggle">
+            <button class="toggle-opt active" data-mode="pre">Pre</button>
+            <button class="toggle-opt" data-mode="post">Post</button>
+          </div>
         </label>
         <button class="btn-primary" id="deg-update">Update chart</button>
       </div>
@@ -358,6 +354,11 @@
 
   </main>
 </div>
+
+  <div id="image-modal" class="image-modal">
+    <span class="image-modal-close">&times;</span>
+    <img id="image-modal-img" src="" alt="Enlarged preview">
+  </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="script.js"></script>
