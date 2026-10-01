@@ -30,8 +30,8 @@
       <div class="ctx-tags">
         <span class="tag">DENTEX 2023</span>
         <span class="tag">UFBA-UESC</span>
-        <span class="tag">9 OOD-C</span>
-        <span class="tag">4 Dental-OOD</span>
+        <span class="tag">4 corruption types</span>
+        <span class="tag">20 OOD conditions (S1–S5)</span>
       </div>
     </div>
   </aside>
@@ -82,7 +82,7 @@
         <option>DentalCalib-Net</option>
       </select>
     </label>
-    <button class="btn-primary" id="runInference">Run inference (simulated)</button>
+    <button class="btn-primary" id="runInference">Run inference</button>
   </div>
 
   <!-- YOLOv8 row: image | data | graph -->
@@ -157,8 +157,8 @@
         <label class="field"><span>Model</span>
           <select id="f-model"><option>All models</option><option>YOLOv8</option><option>RT-DETR</option></select>
         </label>
-        <label class="field"><span>OOD source</span>
-          <select id="f-source"><option>All sources</option><option>DENTEX-C</option><option>Dental-OOD</option></select>
+        <label class="field"><span>OOD source <small style="font-weight:400;color:var(--text-muted,#8a8a8a);">(single source — no effect)</small></span>
+          <select id="f-source" disabled><option>DENTEX-C (only source)</option></select>
         </label>
         <label class="field"><span>Corruption type</span>
           <select id="f-corruption"><option>All types</option><option>Gaussian noise</option><option>Motion blur</option><option>Brightness variation</option><option>JPEG compression</option></select>
@@ -175,22 +175,22 @@
       <div class="grid-4 stat-strip">
         <div class="card stat-card center">
           <div class="stat-label">Avg. ECE</div>
-          <div class="stat-big" id="avg-ece">0.142</div>
+          <div class="stat-big" id="avg-ece">—</div>
           <div class="stat-delta" id="ece-delta">—</div>
         </div>
         <div class="card stat-card center">
           <div class="stat-label">Avg. MCE</div>
-          <div class="stat-big" id="avg-mce">0.261</div>
+          <div class="stat-big" id="avg-mce">—</div>
           <div class="stat-delta" id="mce-delta">—</div>
         </div>
         <div class="card stat-card center">
           <div class="stat-label">Avg. D-ECE</div>
-          <div class="stat-big" id="avg-dece">0.189</div>
+          <div class="stat-big" id="avg-dece">—</div>
           <div class="stat-delta" id="dece-delta">—</div>
         </div>
         <div class="card stat-card center">
           <div class="stat-label">Avg. mAP@0.50</div>
-          <div class="stat-big" id="avg-map">0.334</div>
+          <div class="stat-big" id="avg-map">—</div>
           <div class="stat-delta" id="map-delta">—</div>
         </div>
       </div>
@@ -236,24 +236,24 @@
           <div class="card-title">Raw — before recalibration</div>
           <canvas id="chart-rv-raw" height="180"></canvas>
           <div class="chart-metrics">
-            <span>ECE <b id="rv-raw-ece">0.183</b></span>
-            <span>MCE <b id="rv-raw-mce">0.341</b></span>
-            <span>NLL <b id="rv-raw-nll">1.61</b></span>
+            <span>ECE <b id="rv-raw-ece">—</b></span>
+            <span>MCE <b id="rv-raw-mce">—</b></span>
+            <span>NLL <b id="rv-raw-nll">—</b></span>
           </div>
         </div>
         <div class="card">
           <div class="card-title" id="rv-recal-title">DentalCalib-Net — after recalibration</div>
           <canvas id="chart-rv-recal" height="180"></canvas>
           <div class="chart-metrics">
-            <span>ECE <b id="rv-recal-ece">0.071</b></span>
-            <span>MCE <b id="rv-recal-mce">0.128</b></span>
-            <span>NLL <b id="rv-recal-nll">0.94</b></span>
+            <span>ECE <b id="rv-recal-ece">—</b></span>
+            <span>MCE <b id="rv-recal-mce">—</b></span>
+            <span>NLL <b id="rv-recal-nll">—</b></span>
           </div>
         </div>
       </div>
 
       <div class="card note-card">
-        <span id="rv-summary">RD deviation RMSD: raw 0.142 → post-DCN 0.058 · mAP@0.50 unchanged: 0.282 · Safety invariant maintained</span>
+        <span id="rv-summary">—</span>
       </div>
     </section>
 
@@ -268,8 +268,8 @@
         <label class="field"><span>Model</span>
           <select id="deg-model"><option>Both</option><option>YOLOv8</option><option>RT-DETR</option></select>
         </label>
-        <label class="field"><span>OOD source</span>
-          <select id="deg-source"><option>DENTEX-C</option><option>Dental-OOD</option></select>
+        <label class="field"><span>OOD source <small style="font-weight:400;color:var(--text-muted,#8a8a8a);">(single source — no effect)</small></span>
+          <select id="deg-source" disabled><option>DENTEX-C (only source)</option></select>
         </label>
         <label class="field"><span>Corruption type</span>
           <select id="deg-corruption"><option>Gaussian noise</option><option>Motion blur</option><option>Brightness variation</option><option>JPEG compression</option></select>
@@ -347,7 +347,9 @@
         </div>
         <div class="invariant-note">
           Safety invariant: DentalCalib-Net modifies confidence scores only. Box coordinates and detection decisions
-          are not altered. mAP@0.50 is monitored across all OOD conditions as verification.
+          are not altered. mAP@0.50 can still shift after recalibration, because DentalCalib-Net re-ranks
+          confidence scores non-monotonically — unlike Temperature Scaling, which is monotonic and leaves
+          mAP@0.50 unchanged.
         </div>
       </div>
     </section>

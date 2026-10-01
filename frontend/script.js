@@ -10,11 +10,12 @@
    loadReliabilityBins, loadPerImagePredictions, loadNllData,
    loadTestImageList).
 
-   Page 4 (OOD Degradation Curves) is NOT yet wired to real data --
-   degradationSeries() and renderDegTable() below still use
-   Math.random() and hardcoded rows. Do not treat Page 4's numbers
-   as real findings until that page is integrated the same way as
-   Pages 1-3.
+   Page 4 (OOD Degradation Curves) also reads real data -- see
+   renderDegradationChart() and renderDegTable() below. Its
+   Spearman rho and Status columns come from a hardcoded
+   DECOUPLING_LOOKUP table (Temperature-Scaling-only; see the note
+   above that constant), while the chart and ECE@S5/mAP@S5 numbers
+   are computed live and respond to the Pre/Post toggle.
 
    The Live OPG Auditor only accepts uploads matching filenames
    from the 201-image DENTEX test partition; it does not run live
@@ -35,24 +36,7 @@ navItems.forEach(btn => {
 });
 
 // ---------- Small helpers ----------
-const rand = (min, max) => Math.random() * (max - min) + min;
 const fmt = n => n.toFixed(3);
-
-function reliabilityBins(overconfident = true) {
-  // 10 confidence bins from 0.05 to 0.95
-  const bins = [];
-  for (let i = 0; i < 10; i++) {
-    const conf = (i + 0.5) / 10;
-    let acc;
-    if (overconfident) {
-      acc = conf - (0.05 + conf * 0.25 * Math.random());
-    } else {
-      acc = conf - (0.02 + (1 - conf) * 0.08 * Math.random());
-    }
-    bins.push({ x: conf, y: Math.max(0, Math.min(1, acc)) });
-  }
-  return bins;
-}
 
 // ---------- Chart.js shared config ----------
 Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif";
@@ -465,10 +449,10 @@ async function renderDegTable() {
     <tr>
       <td>${r.model}</td>
       <td>${r.rho.toFixed(4)}<span style="color:#8a8a8a;font-size:0.85em"> (TS)</span></td>
-      <td>${r.decSeverity != null ? "S" + r.decSeverity : "—"}</td>
+      <td>${r.bad && r.decSeverity != null ? "S" + r.decSeverity : "—"}<span style="color:#8a8a8a;font-size:0.85em"> (live, ${method === "dcn" ? "post-DCN" : "pre-recal"})</span></td>
       <td>${r.ece5 != null ? fmt(r.ece5) : "—"}</td>
       <td>${r.map5 != null ? r.map5.toFixed(3) : "—"}</td>
-      <td class="${r.bad ? "status-bad" : "status-good"}">${r.bad ? "Decoupled — dangerous" : "Stable / Coupled"}</td>
+      <td class="${r.bad ? "status-bad" : "status-good"}">${r.bad ? "Decoupled — dangerous" : "Stable / Coupled"}<span style="color:#8a8a8a;font-size:0.85em"> (TS)</span></td>
     </tr>`).join("");
 }
 
@@ -557,7 +541,13 @@ function visibleMethods() {
 }
 
 function computeBaselineAvg(pivoted, methods) {
-  const cleanRows = pivoted.filter(r => r.condition === "clean");
+  const model = document.getElementById("f-model").value;
+  const cleanRows = pivoted.filter(r => {
+    if (r.condition !== "clean") return false;
+    if (model === "YOLOv8" && r.model !== "yolov8") return false;
+    if (model === "RT-DETR" && r.model !== "rtdetr") return false;
+    return true;
+  });
   const vals = [];
   cleanRows.forEach(r => methods.forEach(m => {
     if (r[`ece_${m}`] != null) vals.push(r[`ece_${m}`]);
