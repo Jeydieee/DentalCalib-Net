@@ -42,6 +42,7 @@ if __name__ == "__main__":
                         "confidence_dcn": pred.get("confidence_dcn"),
                         "quadrant": pred.get("quadrant"),
                         "label": pred.get("label"),
+                        "iou": pred.get("best_iou"),
                     })
                 output[filename] = preds
 

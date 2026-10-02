@@ -854,19 +854,39 @@ function summarizeImagePredictions(predictions, confidenceField, nBins = 15) {
   const labelSums = Array(nBins).fill(0);
   let total = 0;
 
+  // 2D confidence x IoU grid for D-ECE, matching calibration_metrics.py's compute_dece
+  const nCells = nBins * nBins;
+  const cellCounts = Array(nCells).fill(0);
+  const cellLabelSums = Array(nCells).fill(0);
+  const cellConfSums = Array(nCells).fill(0);
+  let deceTotal = 0;
+
+  const binIndex = value => Math.min(nBins - 1, Math.max(0, Math.ceil(value * nBins) - 1));
+
   predictions.forEach(prediction => {
     const confidence = Number(prediction[confidenceField]);
     const label = Number(prediction.label);
     if (!Number.isFinite(confidence) || ![0, 1].includes(label)) return;
 
-    const bin = Math.min(nBins - 1, Math.max(0, Math.ceil(confidence * nBins) - 1));
+    const bin = binIndex(confidence);
     counts[bin] += 1;
     confidenceSums[bin] += confidence;
     labelSums[bin] += label;
     total += 1;
+
+    const iou = Number(prediction.iou);
+    if (Number.isFinite(iou) && iou >= 0 && iou <= 1) {
+      const ci = binIndex(confidence);
+      const ii = binIndex(iou);
+      const flat = ci * nBins + ii;
+      cellCounts[flat] += 1;
+      cellLabelSums[flat] += label;
+      cellConfSums[flat] += confidence;
+      deceTotal += 1;
+    }
   });
 
-  if (!total) return { ece: null, mce: null, bins: { confidence: [], accuracy: [] } };
+  if (!total) return { ece: null, mce: null, dece: null, bins: { confidence: [], accuracy: [] } };
 
   const populated = counts.map((count, index) => ({ count, index })).filter(bin => bin.count > 0);
   const gaps = populated.map(({ count, index }) => {
@@ -875,9 +895,22 @@ function summarizeImagePredictions(predictions, confidenceField, nBins = 15) {
     return { confidence, accuracy, gap: Math.abs(accuracy - confidence), weight: count / total };
   });
 
+  let dece = null;
+  if (deceTotal > 0) {
+    dece = 0;
+    for (let cell = 0; cell < nCells; cell++) {
+      const c = cellCounts[cell];
+      if (c === 0) continue;
+      const acc = cellLabelSums[cell] / c;
+      const avgConf = cellConfSums[cell] / c;
+      dece += (c / deceTotal) * Math.abs(acc - avgConf);
+    }
+  }
+
   return {
     ece: gaps.reduce((sum, bin) => sum + bin.weight * bin.gap, 0),
     mce: Math.max(...gaps.map(bin => bin.gap)),
+    dece,
     bins: {
       confidence: gaps.map(bin => bin.confidence),
       accuracy: gaps.map(bin => bin.accuracy),
@@ -907,20 +940,20 @@ async function runAuditorInference() {
 
   document.getElementById("yolo-ece").textContent = showMetric(yoloMetrics.ece);
   document.getElementById("yolo-mce").textContent = showMetric(yoloMetrics.mce);
-  document.getElementById("yolo-dece").textContent = "N/A";
+  document.getElementById("yolo-dece").textContent = showMetric(yoloMetrics.dece);
   document.getElementById("rtdetr-ece").textContent = showMetric(rtMetrics.ece);
   document.getElementById("rtdetr-mce").textContent = showMetric(rtMetrics.mce);
-  document.getElementById("rtdetr-dece").textContent = "N/A";
+  document.getElementById("rtdetr-dece").textContent = showMetric(rtMetrics.dece);
   document.getElementById("s1-yolo").textContent = showMetric(yoloMetrics.ece);
   document.getElementById("s1-rt").textContent = showMetric(rtMetrics.ece);
   document.getElementById("s2-yolo").textContent = showMetric(yoloMetrics.mce);
   document.getElementById("s2-rt").textContent = showMetric(rtMetrics.mce);
-  document.getElementById("s3-yolo").textContent = "N/A";
-  document.getElementById("s3-rt").textContent = "N/A";
+  document.getElementById("s3-yolo").textContent = showMetric(yoloMetrics.dece);
+  document.getElementById("s3-rt").textContent = showMetric(rtMetrics.dece);
 
   const eceDelta = betterModelDelta(yoloMetrics.ece, rtMetrics.ece, "ECE");
   const mceDelta = betterModelDelta(yoloMetrics.mce, rtMetrics.mce, "MCE");
-  const deceDelta = betterModelDelta(null, null, "D-ECE");
+  const deceDelta = betterModelDelta(yoloMetrics.dece, rtMetrics.dece, "D-ECE");
   document.getElementById("s1-delta").textContent = eceDelta.text;
   document.getElementById("s1-delta").className = `stat-delta ${eceDelta.cls}`;
   document.getElementById("s2-delta").textContent = mceDelta.text;
