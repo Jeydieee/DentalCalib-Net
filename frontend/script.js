@@ -738,7 +738,7 @@ let testImageListPromise = null;
 async function loadPerImagePredictions(model, condition) {
   const cacheKey = `${model}__${condition}`;
   if (cacheKey in perImageCache) return perImageCache[cacheKey];
-  const res = await fetch(dataUrl(`per_image/${cacheKey}.json`));
+  const res = await fetch(dataUrl(`per_image/${cacheKey}.json`), { cache: "no-cache" });
   if (!res.ok) throw new Error(`Missing per_image/${cacheKey}.json (HTTP ${res.status})`);
   perImageCache[cacheKey] = await res.json();
   return perImageCache[cacheKey];
