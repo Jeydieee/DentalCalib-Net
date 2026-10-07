@@ -3,11 +3,11 @@
    Impacted Tooth Detection (YOLOv8 / RT-DETR / DentalCalib-Net).
 
    Data sources: precomputed calibration metrics, reliability
-   bins, per-image predictions, and NLL values, exported from the
-   thesis's Stage 5 pipeline (see /data and /images). Pages 1-3
+   bins and per-image predictions, exported from the thesis's
+   Stage 5 pipeline (see /data and /images). Pages 1-3
    (Live OPG Auditor, Benchmark Explorer, Reliability Viewer) read
    real data via the loaders below (loadCalibrationData,
-   loadReliabilityBins, loadPerImagePredictions, loadNllData,
+   loadReliabilityBins, loadPerImagePredictions,
    loadTestImageList).
 
    Page 4 (OOD Degradation Curves) also reads real data -- see
@@ -317,17 +317,17 @@ function degSpearman(eceSeries, mapSeries) {
   return spearman(mapSeries, eceSeries);
 }
 
-// Proposal (Stage 3): a negative rho means accuracy and calibration degrade
-// together (Coupled); a near-zero or positive rho means calibration degrades
-// independently of accuracy (Decoupled, the dangerous failure mode).
-// "Stable" appears in the proposal's Table 18 without a definition, so it is
-// not produced here. "Significant" uses alpha = 0.05 from the proposal.
+// Status follows Table 18 (data_prep/build_table_18.py):
+//   p >= alpha           -> Stable
+//   p <  alpha, rho <  0 -> Coupled
+//   p <  alpha, rho >= 0 -> Decoupled
+// "Stable" is the authors' own label, not defined in the proposal text.
 function decouplingStatus(rho, p) {
-  if (rho == null) return { decoupled: false, significant: false, label: "—" };
-  const decoupled = rho >= 0;
+  if (rho == null) return { decoupled: false, significant: false, stable: false, label: "—" };
   const significant = p != null && p < ALPHA;
-  const base = decoupled ? "Decoupled — dangerous" : "Coupled";
-  return { decoupled, significant, label: significant ? base : `${base} (n.s.)` };
+  if (!significant) return { decoupled: false, significant, stable: true, label: "Stable" };
+  const decoupled = rho >= 0;
+  return { decoupled, significant, stable: false, label: decoupled ? "Decoupled" : "Coupled" };
 }
 
 let degChart;
@@ -502,17 +502,19 @@ async function renderDegTable() {
       <td>${r.decSeverity != null ? "S" + r.decSeverity : "—"}</td>
       <td>${r.ece5 != null ? fmt(r.ece5) : "—"}</td>
       <td>${r.map5 != null ? r.map5.toFixed(3) : "—"}</td>
-      <td class="${r.status.decoupled ? "status-bad" : "status-good"}">${r.status.label}</td>
+      <td class="${r.status.decoupled ? "status-bad" : r.status.stable ? "" : "status-good"}">${r.status.label}</td>
     </tr>`).join("");
 
   document.getElementById("deg-note").innerHTML = `
     <b>Basis:</b> all values use <b>${DEG_METHOD_NAMES[method]}</b> confidences.
     ρ is the Spearman rank correlation between mAP@0.50 and ECE across S1–S5;
     p is two-sided (scipy.stats.spearmanr). With five severity levels,
-    |ρ| ≥ 0.878 is needed for significance at α = ${ALPHA}; "n.s." means not significant.<br />
-    <b>Status (proposal rule):</b> negative ρ = Coupled (accuracy and calibration
-    degrade together); near-zero or positive ρ = Decoupled (calibration degrades
-    independently of accuracy).<br />
+    |ρ| ≥ 0.878 is needed for significance at α = ${ALPHA}.<br />
+    <b>Status (as in Table 18):</b> p ≥ α is <b>Stable</b> (no statistically detectable
+    mAP–ECE relationship; this label is the authors' own and is not defined in the
+    proposal text). With p &lt; α, a negative ρ is <b>Coupled</b> (accuracy and calibration
+    degrade together) and a non-negative ρ is <b>Decoupled</b> (calibration degrades
+    independently of accuracy, the dangerous failure mode).<br />
     <b>Decoupling severity</b> is a visual aid, not a measure defined in the proposal:
     the severity step where the normalized ECE and mAP trends diverge most. It is
     shown only for Decoupled curves.`;
@@ -556,9 +558,9 @@ function modelName(key) {
   return key === "yolov8" ? "YOLOv8" : "RT-DETR";
 }
 
-// Optimized Temperature Scaling parameter, one per model (learned on the
-// validation logits in Stage 4). Fill in from the training log.
-const TEMPERATURE_LOOKUP = { yolov8: null, rtdetr: null };
+// Optimized Temperature Scaling parameter, one per model, learned on the
+// validation logits (stage4_outputs/temperature_scaling_params.json).
+const TEMPERATURE_LOOKUP = { yolov8: 1.5669029187255183, rtdetr: 0.9256808418850526 };
 
 function pivotByCondition(rows) {
   const groups = {};
@@ -859,7 +861,8 @@ function drawImageWithBoxes(canvasId, imagePath, predictions, threshold, confFie
       ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
       ctx.fillStyle = isCorrect ? "#2F7D4F" : "#C4501E";
       ctx.font = "12px monospace";
-      ctx.fillText(conf.toFixed(2), x1, Math.max(10, y1 - 4));
+      const tag = pred.quadrant ? `Q${pred.quadrant} ` : "";
+      ctx.fillText(`${tag}${conf.toFixed(2)}`, x1, Math.max(10, y1 - 4));
     });
   };
   img.onerror = () => console.error(`Failed to load image: ${imagePath}`);
@@ -924,14 +927,15 @@ function calibrationInterpretation(binEntry) {
   return { text: "Roughly calibrated, with some bin-level deviation", cls: "good" };
 }
 
-function betterModelDelta(yoloVal, rtVal, label) {
+// Signed difference only (RT-DETR minus YOLOv8). No "better" verdict: per-image
+// values are dominated by low-score detections, so they are not a model ranking.
+function modelDifference(yoloVal, rtVal, label) {
   if (!Number.isFinite(yoloVal) || !Number.isFinite(rtVal)) {
     return { text: `${label} unavailable per image`, cls: "" };
   }
   const diff = rtVal - yoloVal;
-  const better = diff < 0 ? "RT-DETR" : diff > 0 ? "YOLOv8" : null;
-  if (better === null) return { text: `Tied (${label})`, cls: "" };
-  return { text: `${better} ${diff.toFixed(3)} better`, cls: "good" };
+  const sign = diff >= 0 ? "+" : "−";
+  return { text: `RT-DETR − YOLOv8: ${sign}${Math.abs(diff).toFixed(3)} (this image only)`, cls: "" };
 }
 
 // Appendix 4: delta indicator showing ECE and MCE improvement relative to raw,
@@ -1073,9 +1077,9 @@ async function runAuditorInference() {
   document.getElementById("s3-yolo").textContent = showMetric(yoloMetrics.dece);
   document.getElementById("s3-rt").textContent = showMetric(rtMetrics.dece);
 
-  const eceDelta = betterModelDelta(yoloMetrics.ece, rtMetrics.ece, "ECE");
-  const mceDelta = betterModelDelta(yoloMetrics.mce, rtMetrics.mce, "MCE");
-  const deceDelta = betterModelDelta(yoloMetrics.dece, rtMetrics.dece, "D-ECE");
+  const eceDelta = modelDifference(yoloMetrics.ece, rtMetrics.ece, "ECE");
+  const mceDelta = modelDifference(yoloMetrics.mce, rtMetrics.mce, "MCE");
+  const deceDelta = modelDifference(yoloMetrics.dece, rtMetrics.dece, "D-ECE");
   document.getElementById("s1-delta").textContent = eceDelta.text;
   document.getElementById("s1-delta").className = `stat-delta ${eceDelta.cls}`;
   document.getElementById("s2-delta").textContent = mceDelta.text;
@@ -1095,12 +1099,12 @@ async function runAuditorInference() {
   rtNoteEl.textContent = rtNote.text;
   rtNoteEl.className = `chart-note ${rtNote.cls}`;
 
-  drawImageWithBoxes("canvas-yolo", imagePath, yoloPreds, DISPLAY_MIN_CONF, confField);
-  drawImageWithBoxes("canvas-rtdetr", imagePath, rtPreds, DISPLAY_MIN_CONF, confField);
+  drawImageWithBoxes("canvas-yolo", imagePath, yoloPreds, DISPLAY_MIN_CONF, "confidence_raw");
+  drawImageWithBoxes("canvas-rtdetr", imagePath, rtPreds, DISPLAY_MIN_CONF, "confidence_raw");
 
   const rawYolo = method === "raw" ? yoloMetrics : summarizeImagePredictions(yoloPreds, "confidence_raw");
   const rawRt = method === "raw" ? rtMetrics : summarizeImagePredictions(rtPreds, "confidence_raw");
-  const shown = preds => preds.filter(p => p[confField] >= DISPLAY_MIN_CONF).length;
+  const shown = preds => preds.filter(p => p.confidence_raw >= DISPLAY_MIN_CONF).length;
   showRecalDelta("yolo", method, rawYolo, yoloMetrics, yoloPreds.length, shown(yoloPreds));
   showRecalDelta("rtdetr", method, rawRt, rtMetrics, rtPreds.length, shown(rtPreds));
 }
