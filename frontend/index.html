@@ -39,7 +39,6 @@
           <div class="ctx-label">Dataset context</div>
           <div class="ctx-tags">
             <span class="tag">DENTEX 2023</span>
-            <span class="tag">UFBA-UESC</span>
             <span class="tag">4 corruption types</span>
             <span class="tag">20 OOD conditions (S1–S5)</span>
           </div>
@@ -88,7 +87,7 @@
                 <option>Gaussian noise</option>
                 <option>Motion blur</option>
                 <option>JPEG compression</option>
-                <option>Pixel exposure</option>
+                <option>Brightness variation</option>
               </select>
             </label>
             <label class="field">
@@ -105,6 +104,7 @@
             </label>
             <button class="btn-primary" id="runInference">Show results</button>
           </div>
+          <div class="cond-info" id="cond-info"></div>
 
           <!-- YOLOv8 row: image | data | graph -->
           <div class="card model-card">
@@ -129,6 +129,8 @@
                 <div class="metric-item">
                   <span>D-ECE</span><b id="yolo-dece">—</b>
                 </div>
+                <div class="stat-delta" id="yolo-vs-raw">—</div>
+                <div class="chart-note" id="yolo-n">—</div>
               </div>
               <div class="model-chart">
                 <div class="chart-label">Reliability diagram</div>
@@ -163,6 +165,8 @@
                 <div class="metric-item">
                   <span>D-ECE</span><b id="rtdetr-dece">—</b>
                 </div>
+                <div class="stat-delta" id="rtdetr-vs-raw">—</div>
+                <div class="chart-note" id="rtdetr-n">—</div>
               </div>
               <div class="model-chart">
                 <div class="chart-label">Reliability diagram</div>
@@ -222,18 +226,6 @@
               </select>
             </label>
             <label class="field"
-              ><span
-                >OOD source
-                <small
-                  style="font-weight: 400; color: var(--text-muted, #8a8a8a)"
-                  >(single source — no effect)</small
-                ></span
-              >
-              <select id="f-source" disabled>
-                <option>DENTEX-C (only source)</option>
-              </select>
-            </label>
-            <label class="field"
               ><span>Corruption type</span>
               <select id="f-corruption">
                 <option>All types</option>
@@ -261,6 +253,15 @@
                 <option>Raw</option>
                 <option>Temp. scaling</option>
                 <option>DentalCalib-Net</option>
+              </select>
+            </label>
+            <label class="field"
+              ><span>Metric</span>
+              <select id="f-metric">
+                <option>ECE</option>
+                <option>MCE</option>
+                <option>D-ECE</option>
+                <option>mAP@0.50</option>
               </select>
             </label>
             <button class="btn-primary" id="applyFilters">Apply filters</button>
@@ -296,12 +297,13 @@
                   <th>Model</th>
                   <th>Condition</th>
                   <th>Sev.</th>
-                  <th>ECE (Raw)</th>
-                  <th>ECE (TS)</th>
-                  <th>ECE (DCN)</th>
-                  <th>MCE (Raw)</th>
-                  <th>D-ECE (Raw)</th>
-                  <th>mAP@0.50 (Raw)</th>
+                  <th class="m-raw" id="th-raw">ECE (Raw)</th>
+                  <th class="m-ts" id="th-ts">ECE (TS)</th>
+                  <th class="m-dcn" id="th-dcn">ECE (DCN)</th>
+                  <th class="m-raw" id="th-draw">ΔECE (Raw)</th>
+                  <th class="m-ts" id="th-dts">ΔECE (TS)</th>
+                  <th class="m-dcn" id="th-ddcn">ΔECE (DCN)</th>
+                  <th>T</th>
                 </tr>
               </thead>
               <tbody>
@@ -332,6 +334,7 @@
             <label class="field"
               ><span>OOD condition</span>
               <select id="rv-condition">
+                <option>Clean (baseline)</option>
                 <option>Gaussian noise</option>
                 <option>Motion blur</option>
                 <option>Brightness variation</option>
@@ -364,7 +367,7 @@
               <div class="chart-metrics">
                 <span>ECE <b id="rv-raw-ece">—</b></span>
                 <span>MCE <b id="rv-raw-mce">—</b></span>
-                <span>NLL <b id="rv-raw-nll">—</b></span>
+                <span>D-ECE <b id="rv-raw-dece">—</b></span>
               </div>
             </div>
             <div class="card">
@@ -375,7 +378,7 @@
               <div class="chart-metrics">
                 <span>ECE <b id="rv-recal-ece">—</b></span>
                 <span>MCE <b id="rv-recal-mce">—</b></span>
-                <span>NLL <b id="rv-recal-nll">—</b></span>
+                <span>D-ECE <b id="rv-recal-dece">—</b></span>
               </div>
             </div>
           </div>
@@ -405,18 +408,6 @@
               </select>
             </label>
             <label class="field"
-              ><span
-                >OOD source
-                <small
-                  style="font-weight: 400; color: var(--text-muted, #8a8a8a)"
-                  >(single source — no effect)</small
-                ></span
-              >
-              <select id="deg-source" disabled>
-                <option>DENTEX-C (only source)</option>
-              </select>
-            </label>
-            <label class="field"
               ><span>Corruption type</span>
               <select id="deg-corruption">
                 <option>Gaussian noise</option>
@@ -428,8 +419,9 @@
             <label class="field"
               ><span>Recalibration</span>
               <div class="toggle" id="deg-recalib-toggle">
-                <button class="toggle-opt active" data-mode="pre">Pre</button>
-                <button class="toggle-opt" data-mode="post">Post</button>
+                <button class="toggle-opt active" data-mode="raw">Raw</button>
+                <button class="toggle-opt" data-mode="ts">TS</button>
+                <button class="toggle-opt" data-mode="dcn">DCN</button>
               </div>
             </label>
             <button class="btn-primary" id="deg-update">Update chart</button>
@@ -445,6 +437,8 @@
                 <tr>
                   <th>Model</th>
                   <th>Spearman ρ</th>
+                  <th>p-value</th>
+                  <th>Significance (α = 0.05)</th>
                   <th>Decoupling severity</th>
                   <th>ECE@S5</th>
                   <th>mAP@S5</th>
@@ -456,6 +450,7 @@
               </tbody>
             </table>
           </div>
+          <div class="card note-card" id="deg-note">—</div>
         </section>
 
         <!-- PAGE 5: DENTALCALIB-NET PIPELINE -->
@@ -470,22 +465,37 @@
 
           <div class="card">
             <div class="pipeline-label">A — End-to-end inference pipeline</div>
-            <div class="pipeline-flow">
+            <div class="pipeline-split">
               <div class="pipe-node">OPG image</div>
               <div class="pipe-arrow">→</div>
-              <div class="pipe-node">
-                Detector<br /><small>YOLOv8 / RT-DETR</small>
-              </div>
-              <div class="pipe-arrow">→</div>
-              <div class="pipe-node">
-                Quality extractor<br /><small>Laplacian · σ · exposure</small>
+              <div class="pipe-branches">
+                <div class="pipe-branch">
+                  <div class="pipe-node">
+                    Selected detector<br /><small>YOLOv8 / RT-DETR</small>
+                  </div>
+                  <div class="pipe-arrow">→</div>
+                  <div class="pipe-node">
+                    Detection outputs<br /><small>raw confidence · boxes · logits</small>
+                  </div>
+                </div>
+                <div class="pipe-branch">
+                  <div class="pipe-node">
+                    Quality feature extraction<br /><small>per image</small>
+                  </div>
+                  <div class="pipe-arrow">→</div>
+                  <div class="pipe-node">
+                    Quality features<br /><small>Laplacian variance · pixel σ · JPEG block score</small>
+                  </div>
+                </div>
               </div>
               <div class="pipe-arrow">→</div>
               <div class="pipe-node accent">
-                DentalCalib-Net<br /><small>3-layer MLP</small>
+                DentalCalib-Net<br /><small>3-layer MLP · 8-dim input</small>
               </div>
               <div class="pipe-arrow">→</div>
-              <div class="pipe-node">Calibrated confidence</div>
+              <div class="pipe-node">
+                Calibrated confidence<br /><small>one score per box</small>
+              </div>
             </div>
           </div>
 
@@ -504,8 +514,8 @@
               <div class="pipe-compare">
                 <div class="compare-title">DentalCalib-Net</div>
                 <p>
-                  Quality-conditioned correction. Larger adjustments for
-                  degraded images, smaller for clean ones.
+                  Quality-conditioned correction, designed to apply larger
+                  adjustments to degraded images and smaller ones to clean images.
                 </p>
               </div>
             </div>
@@ -513,22 +523,30 @@
 
           <div class="card">
             <div class="pipeline-label">C — 8-dimensional input vector</div>
+            <div class="feature-group-label">Detection features (5)</div>
             <div class="feature-grid">
               <span class="feature-chip">Raw confidence</span>
-              <span class="feature-chip">BBox w</span>
-              <span class="feature-chip">BBox h</span>
-              <span class="feature-chip">BBox x</span>
-              <span class="feature-chip">BBox y</span>
-              <span class="feature-chip">Laplacian variance</span>
-              <span class="feature-chip">Pixel σ (exposure)</span>
-              <span class="feature-chip">JPEG block score</span>
+              <span class="feature-chip">BBox width</span>
+              <span class="feature-chip">BBox height</span>
+              <span class="feature-chip">BBox center x</span>
+              <span class="feature-chip">BBox center y</span>
+            </div>
+            <div class="feature-group-label">
+              Image quality features (3): the quality-conditioning mechanism,
+              absent from Temperature Scaling
+            </div>
+            <div class="feature-grid">
+              <span class="feature-chip quality">Laplacian variance (sharpness)</span>
+              <span class="feature-chip quality">Pixel σ (exposure / contrast)</span>
+              <span class="feature-chip quality">JPEG block score (compression)</span>
             </div>
             <div class="invariant-note">
               Safety invariant: DentalCalib-Net modifies confidence scores only.
-              Box coordinates and detection decisions are not altered. mAP@0.50
-              can still shift after recalibration, because DentalCalib-Net
-              re-ranks confidence scores non-monotonically — unlike Temperature
-              Scaling, which is monotonic and leaves mAP@0.50 unchanged.
+              Bounding-box coordinates are unchanged. Because its correction
+              need not be monotonic in the raw score, detections can be
+              re-ranked, so mAP@0.50 can shift and is monitored across all
+              conditions. Temperature Scaling is monotonic, so it leaves the
+              ranking, and therefore mAP@0.50, unchanged.
             </div>
           </div>
         </section>

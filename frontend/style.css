@@ -117,8 +117,8 @@ body {
 /* ===== Main ===== */
 .main {
   flex: 1;
-  padding: 36px 44px 60px;
-  max-width: 1080px;
+  padding: 36px 28px 60px;
+  max-width: 1500px;
 }
 
 .page { display: none; }
@@ -568,3 +568,118 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 .opg-preview canvas {
   cursor: zoom-in;
 }
+
+/* ===== Benchmark Explorer: method-coded headers + pinned clean rows ===== */
+#results-table thead th { height: 40px; }
+.table-card:has(#results-table) thead th { z-index: 3; }
+#results-table thead th.m-raw { box-shadow: inset 0 3px 0 #C4501E; }
+#results-table thead th.m-ts  { box-shadow: inset 0 3px 0 #3F5F8F; }
+#results-table thead th.m-dcn { box-shadow: inset 0 3px 0 #1E6E63; }
+
+#results-table tbody tr.pinned-row td {
+  position: sticky;
+  z-index: 2;
+  height: 36px;
+  background: #EAF3F1;
+  font-weight: 600;
+}
+#results-table tbody tr.pinned-row.p1 td { top: 40px; }
+#results-table tbody tr.pinned-row.p2 td { top: 76px; box-shadow: 0 1px 0 var(--primary); }
+
+/* ===== Pipeline page: parallel branches + labelled feature groups ===== */
+.pipeline-split {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pipe-branches {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 12px;
+  border-left: 2px solid var(--border);
+  border-right: 2px solid var(--border);
+}
+
+.pipe-branch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.feature-group-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin: 0 0 8px;
+}
+
+.feature-chip.quality {
+  background: #E3F0ED;
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+
+/* ===== Pipeline page: wider canvas so Block A fits on one row ===== */
+/* Never wrap Block A into a broken layout; scroll sideways on very narrow windows */
+.pipeline-split {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.pipeline-split .pipe-node {
+  min-width: 96px;
+  padding: 12px 12px;
+}
+
+.pipe-branch .pipe-node {
+  max-width: 200px;
+}
+
+.pipeline-split .pipe-arrow,
+.pipe-branch .pipe-arrow {
+  flex-shrink: 0;
+}
+
+/* ===== Live OPG Auditor: image and chart fill the wider card ===== */
+@media (min-width: 901px) {
+  .model-row {
+    grid-template-columns: clamp(240px, 26vw, 400px) 150px minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .model-chart {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Chart height follows the (square) image beside it */
+  .model-chart .chart-wrap {
+    flex: 1;
+    height: auto;
+    min-height: 260px;
+  }
+
+  .model-chart .chart-wrap canvas {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+
+.cond-info {
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--primary);
+  background: rgba(127, 127, 127, 0.08);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.cond-info b { display: block; margin-bottom: 2px; }
+.cond-info .analog { margin-top: 4px; opacity: 0.75; }

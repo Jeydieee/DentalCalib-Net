@@ -11,11 +11,11 @@
    loadTestImageList).
 
    Page 4 (OOD Degradation Curves) also reads real data -- see
-   renderDegradationChart() and renderDegTable() below. Its
-   Spearman rho and Status columns come from a hardcoded
-   DECOUPLING_LOOKUP table (Temperature-Scaling-only; see the note
-   above that constant), while the chart and ECE@S5/mAP@S5 numbers
-   are computed live and respond to the Pre/Post toggle.
+   renderDegradationChart() and renderDegTable() below. Spearman
+   rho, p-values and the Coupled / Decoupled status are computed
+   live from calibration_results.json for the selected method
+   (Raw / TS / DCN); the chart and ECE@S5 / mAP@S5 numbers use
+   the same rows.
 
    The Live OPG Auditor only accepts uploads matching filenames
    from the 201-image DENTEX test partition; it does not run live
@@ -87,6 +87,7 @@ function reliabilityChart(canvasId, bins, color) {
     },
   options: {
       responsive: true,
+      maintainAspectRatio: !ctx.closest(".chart-wrap"),
       scales: {
         x: { type: "linear", min: 0, max: 1, title: { display: true, text: "Confidence" }, grid: { color: "#EEEBE1" } },
         y: { min: 0, max: 1, title: { display: true, text: "Accuracy" }, grid: { color: "#EEEBE1" } },
@@ -164,6 +165,8 @@ async function refreshReliabilityViewer() {
   const condLabel = document.getElementById("rv-condition").value;
   const severity = document.getElementById("rv-severity").value;
   const condition = conditionKeyFromLabel(condLabel, severity);
+  const isClean = condLabel === "Clean (baseline)";
+  document.getElementById("rv-severity").disabled = isClean;
   const methodLabel = document.getElementById("rv-method").value;
   const recalMethod = methodLabel === "DentalCalib-Net" ? "dcn" : "ts";
 
@@ -189,21 +192,18 @@ async function refreshReliabilityViewer() {
     ? calibrationData.find(r => r.model === model && r.condition === condition && r.confidence_type === recalMethod)
     : null;
 
-  await loadNllData();
-  const nllKey = `${model}__${condition}`;
-  const nllEntry = nllData[nllKey];
+  const showMetric = value => (value == null ? "—" : fmt(value));
 
-  document.getElementById("rv-raw-ece").textContent = calRow ? fmt(calRow.ece) : "—";
-  document.getElementById("rv-raw-mce").textContent = calRow ? fmt(calRow.mce) : "—";
-  document.getElementById("rv-raw-nll").textContent = nllEntry ? fmt(nllEntry.nll_raw) : "—";
+  document.getElementById("rv-raw-ece").textContent = calRow ? showMetric(calRow.ece) : "—";
+  document.getElementById("rv-raw-mce").textContent = calRow ? showMetric(calRow.mce) : "—";
+  document.getElementById("rv-raw-dece").textContent = calRow ? showMetric(calRow.dece) : "—";
 
-  document.getElementById("rv-recal-ece").textContent = calRowRecal ? fmt(calRowRecal.ece) : "—";
-  document.getElementById("rv-recal-mce").textContent = calRowRecal ? fmt(calRowRecal.mce) : "—";
-  document.getElementById("rv-recal-nll").textContent =
-    recalMethod === "ts" && nllEntry ? fmt(nllEntry.nll_ts) : "N/A";
+  document.getElementById("rv-recal-ece").textContent = calRowRecal ? showMetric(calRowRecal.ece) : "—";
+  document.getElementById("rv-recal-mce").textContent = calRowRecal ? showMetric(calRowRecal.mce) : "—";
+  document.getElementById("rv-recal-dece").textContent = calRowRecal ? showMetric(calRowRecal.dece) : "—";
 
-  const rmsdRow = calRow ? fmt(calRow.rmsd ?? 0) : "—";
-  const rmsdRecal = calRowRecal ? fmt(calRowRecal.rmsd ?? 0) : "—";
+  const rmsdRow = calRow && calRow.rmsd != null ? fmt(calRow.rmsd) : "—";
+  const rmsdRecal = calRowRecal && calRowRecal.rmsd != null ? fmt(calRowRecal.rmsd) : "—";
   const mapNote = calRow && calRowRecal
     ? (calRow.map50 === calRowRecal.map50 ? "mAP@0.50 unchanged" : `mAP@0.50 ${calRow.map50.toFixed(3)} → ${calRowRecal.map50.toFixed(3)}`)
     : "";
@@ -219,25 +219,18 @@ async function refreshReliabilityViewer() {
 loadCalibrationData().then(() => refreshReliabilityViewer());
 
 // ---------- Page 4: OOD Degradation Curves (REAL DATA) ----------
+// Spearman rho, its p-value and the Coupled / Decoupled status are computed
+// live from calibration_results.json for the selected method (Raw / TS / DCN),
+// so the chart, the table and the status always describe the same rows.
+// The p-value matches scipy.stats.spearmanr (two-sided, t-approximation, which
+// for n = 5 severity levels has 3 degrees of freedom).
 
-// Ground truth from Tables 11, 12, 18 -- computed under Temperature Scaling
-// only, since that's the only per-corruption-type Spearman correlation your
-// thesis actually computed. No equivalent DCN correlation exists in your
-// documented results, so the rho/status columns always reflect TS, even
-// when the chart and ECE@S5/mAP@S5 numbers are toggled to show DCN.
-const DECOUPLING_LOOKUP = {
-  yolov8: {
-    gaussian_noise: { rho: 0.7071, status: "Stable" },
-    motion_blur: { rho: 0.9000, status: "Decoupled" },
-    brightness_variation: { rho: 0.7000, status: "Stable" },
-    jpeg_compression: { rho: 1.0000, status: "Decoupled" },
-  },
-  rtdetr: {
-    gaussian_noise: { rho: 0.0000, status: "Stable" },
-    motion_blur: { rho: 0.7000, status: "Stable" },
-    brightness_variation: { rho: -0.6000, status: "Stable" },
-    jpeg_compression: { rho: 0.3000, status: "Stable" },
-  },
+const ALPHA = 0.05;
+const DEG_SEVERITIES = [1, 2, 3, 4, 5];
+const DEG_METHOD_NAMES = {
+  raw: "Raw (no recalibration)",
+  ts: "Temperature Scaling",
+  dcn: "DentalCalib-Net",
 };
 
 function degCorruptionKey(label) {
@@ -257,18 +250,92 @@ function degModelsSelected(label) {
 
 function degRecalMethod() {
   const active = document.querySelector("#deg-recalib-toggle .toggle-opt.active");
-  return active?.dataset.mode === "post" ? "dcn" : "raw";
+  return active?.dataset.mode || "raw";
+}
+
+// ECE and mAP@0.50 at S1..S5 for one model / corruption / method
+function degSeries(model, corruption, method) {
+  const ece = [];
+  const map = [];
+  DEG_SEVERITIES.forEach(s => {
+    const row = calibrationData.find(
+      r => r.model === model && r.condition === `${corruption}_S${s}` && r.confidence_type === method
+    );
+    ece.push(row ? row.ece : null);
+    map.push(row ? row.map50 : null);
+  });
+  return { ece, map };
+}
+
+// ---- Spearman rank correlation (average ranks for ties, like scipy) ----
+function averageRanks(values) {
+  const order = values.map((v, i) => ({ v, i })).sort((a, b) => a.v - b.v);
+  const ranks = new Array(values.length);
+  let i = 0;
+  while (i < order.length) {
+    let j = i;
+    while (j + 1 < order.length && order[j + 1].v === order[i].v) j++;
+    const rank = (i + j) / 2 + 1;
+    for (let k = i; k <= j; k++) ranks[order[k].i] = rank;
+    i = j + 1;
+  }
+  return ranks;
+}
+
+function pearson(a, b) {
+  const n = a.length;
+  const ma = a.reduce((s, v) => s + v, 0) / n;
+  const mb = b.reduce((s, v) => s + v, 0) / n;
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < n; i++) {
+    num += (a[i] - ma) * (b[i] - mb);
+    da += (a[i] - ma) ** 2;
+    db += (b[i] - mb) ** 2;
+  }
+  return da > 0 && db > 0 ? num / Math.sqrt(da * db) : null;
+}
+
+// Two-sided p-value of a t statistic with 3 degrees of freedom (n = 5).
+function pFromT3(t) {
+  const s = Math.abs(t) / Math.sqrt(3);
+  const cdf = 0.5 + (s / (1 + s * s) + Math.atan(s)) / Math.PI;
+  return 2 * (1 - cdf);
+}
+
+function spearman(x, y) {
+  if (x.length !== 5) return { rho: null, p: null }; // p-value formula above is for n = 5
+  const rho = pearson(averageRanks(x), averageRanks(y));
+  if (rho == null) return { rho: null, p: null };
+  if (Math.abs(rho) >= 1) return { rho, p: 0 };
+  const t = rho * Math.sqrt(3 / (1 - rho * rho));
+  return { rho, p: pFromT3(t) };
+}
+
+// mAP@0.50 vs ECE across S1-S5; needs all five severity levels
+function degSpearman(eceSeries, mapSeries) {
+  if (eceSeries.some(v => v == null) || mapSeries.some(v => v == null)) return { rho: null, p: null };
+  return spearman(mapSeries, eceSeries);
+}
+
+// Proposal (Stage 3): a negative rho means accuracy and calibration degrade
+// together (Coupled); a near-zero or positive rho means calibration degrades
+// independently of accuracy (Decoupled, the dangerous failure mode).
+// "Stable" appears in the proposal's Table 18 without a definition, so it is
+// not produced here. "Significant" uses alpha = 0.05 from the proposal.
+function decouplingStatus(rho, p) {
+  if (rho == null) return { decoupled: false, significant: false, label: "—" };
+  const decoupled = rho >= 0;
+  const significant = p != null && p < ALPHA;
+  const base = decoupled ? "Decoupled — dangerous" : "Coupled";
+  return { decoupled, significant, label: significant ? base : `${base} (n.s.)` };
 }
 
 let degChart;
 
-// Finds the severity step where a model's ECE and mAP stop moving in
-// opposite-and-proportional directions (the "decoupling point"). Not a
-// formula specified in the proposal -- our own construction, flagged for
-// documentation. Normalizes both series to 0-1, then finds the largest
-// deviation from the expected delta_ece = -delta_map relationship between
-// consecutive severities. Returns the LATER severity of that pair (where
-// the divergence becomes visible), or null if there isn't enough valid data.
+// Visual aid only (not a measure defined in the proposal): the severity step
+// where the normalized ECE and mAP trends diverge most from the expected
+// "ECE up, mAP down" relationship. Returns the LATER severity of that step,
+// or null if there is not enough valid data.
 function computeDecouplingSeverity(eceSeries, mapSeries, severities) {
   const valid = severities.map((s, i) => ({ s, ece: eceSeries[i], map: mapSeries[i] }))
     .filter(p => p.ece != null && p.map != null);
@@ -297,40 +364,43 @@ function computeDecouplingSeverity(eceSeries, mapSeries, severities) {
   return worstIdx >= 0 ? valid[worstIdx + 1].s : null;
 }
 
+// Draws one dashed vertical line per marker passed in the chart's
+// plugin options: { markers: [{ severity, color, text }] }
 const decouplingLinePlugin = {
   id: "decouplingLine",
-  afterDraw(chart) {
-    const severity = chart.$decouplingSeverity;
-    const color = chart.$decouplingColor;
-    if (severity == null) return;
+  afterDraw(chart, args, opts) {
+    const markers = opts?.markers || [];
+    if (!markers.length) return;
     const { ctx, chartArea, scales } = chart;
-    const x = scales.x.getPixelForValue(chart.data.labels.indexOf(severity));
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = color || "#C4501E";
-    ctx.lineWidth = 2;
-    ctx.moveTo(x, chartArea.top);
-    ctx.lineTo(x, chartArea.bottom);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    markers.forEach((m, idx) => {
+      const x = scales.x.getPixelForValue(chart.data.labels.indexOf(m.severity));
+      const color = m.color || "#C4501E";
 
-    ctx.fillStyle = color || "#C4501E";
-    ctx.font = "11px sans-serif";
-    const label = `Decoupling point (S${severity})`;
-    const labelWidth = ctx.measureText(label).width;
-    const padding = 6;
-    const fitsOnRight = x + padding + labelWidth <= chartArea.right;
+      ctx.save();
+      ctx.beginPath();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.moveTo(x, chartArea.top);
+      ctx.lineTo(x, chartArea.bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
 
-    if (fitsOnRight) {
-      ctx.textAlign = "left";
-      ctx.fillText(label, x + padding, chartArea.top + 12);
-    } else {
-      ctx.textAlign = "right";
-      ctx.fillText(label, x - padding, chartArea.top + 12);
-    }
-    ctx.restore();
+      ctx.fillStyle = color;
+      ctx.font = "11px sans-serif";
+      const labelWidth = ctx.measureText(m.text).width;
+      const padding = 6;
+      const y = chartArea.top + 12 + idx * 14;
+      if (x + padding + labelWidth <= chartArea.right) {
+        ctx.textAlign = "left";
+        ctx.fillText(m.text, x + padding, y);
+      } else {
+        ctx.textAlign = "right";
+        ctx.fillText(m.text, x - padding, y);
+      }
+      ctx.restore();
+    });
   },
 };
 
@@ -340,26 +410,17 @@ async function renderDegradationChart() {
   const models = degModelsSelected(document.getElementById("deg-model").value);
   const corruption = degCorruptionKey(document.getElementById("deg-corruption").value);
   const method = degRecalMethod();
-  const severities = [1, 2, 3, 4, 5];
   const colors = { yolov8: "#C4501E", rtdetr: "#1E6E63" };
   const datasets = [];
-  let decouplingSeverity = null;
-  let decouplingColor = null;
+  const markers = [];
 
   models.forEach(model => {
-    const eceSeries = [];
-    const mapSeries = [];
-    severities.forEach(s => {
-      const row = calibrationData.find(
-        r => r.model === model && r.condition === `${corruption}_S${s}` && r.confidence_type === method
-      );
-      eceSeries.push(row ? row.ece : null);
-      mapSeries.push(row ? row.map50 : null);
-    });
+    const { ece, map } = degSeries(model, corruption, method);
     const label = model === "yolov8" ? "YOLOv8" : "RT-DETR";
+
     datasets.push({
       label: `${label} ECE`,
-      data: eceSeries,
+      data: ece,
       borderColor: colors[model],
       backgroundColor: colors[model],
       yAxisID: "y",
@@ -367,7 +428,7 @@ async function renderDegradationChart() {
     });
     datasets.push({
       label: `${label} mAP@0.50`,
-      data: mapSeries,
+      data: map,
       borderColor: colors[model],
       backgroundColor: colors[model],
       borderDash: [5, 3],
@@ -375,45 +436,36 @@ async function renderDegradationChart() {
       tension: 0.2,
     });
 
-    // Decoupling marker only computed/shown in single-model view -- see
-    // note in documentation on why "Both" mode has no combined marker.
-    if (models.length === 1) {
-      decouplingSeverity = computeDecouplingSeverity(eceSeries, mapSeries, severities);
-      decouplingColor = colors[model];
+    // The decoupling marker is drawn only for curves whose status is Decoupled.
+    const { rho, p } = degSpearman(ece, map);
+    if (decouplingStatus(rho, p).decoupled) {
+      const severity = computeDecouplingSeverity(ece, map, DEG_SEVERITIES);
+      if (severity != null) {
+        markers.push({ severity, color: colors[model], text: `${label}: decoupling point (S${severity})` });
+      }
     }
   });
-
-  if (decouplingSeverity != null) {
-    datasets.push({
-      label: `Decoupling point (S${decouplingSeverity})`,
-      data: severities.map(() => null),
-      borderColor: decouplingColor,
-      borderDash: [4, 4],
-      borderWidth: 2,
-      pointRadius: 0,
-      yAxisID: "y",
-    });
-  }
 
   const ctx = document.getElementById("chart-degradation");
   if (degChart) degChart.destroy();
   degChart = new Chart(ctx, {
     type: "line",
-    data: { labels: severities, datasets },
+    data: { labels: DEG_SEVERITIES, datasets },
     options: {
       responsive: true,
       scales: {
         x: { title: { display: true, text: "OOD severity" }, grid: { display: false } },
-        y: { position: "left", title: { display: true, text: "ECE" }, grid: { color: "#EEEBE1" } },
-        y1: { position: "right", title: { display: true, text: "mAP@0.50" }, grid: { display: false } },
+        // Both axes start at zero so neither series is visually exaggerated.
+        y: { position: "left", min: 0, title: { display: true, text: "ECE (left axis)" }, grid: { color: "#EEEBE1" } },
+        y1: { position: "right", min: 0, max: 1, title: { display: true, text: "mAP@0.50 (right axis)" }, grid: { display: false } },
       },
-      plugins: { legend: { position: "top", align: "end" } },
+      plugins: {
+        legend: { position: "top", align: "end" },
+        decouplingLine: { markers },
+      },
     },
     plugins: [decouplingLinePlugin],
   });
-  degChart.$decouplingSeverity = decouplingSeverity;
-  degChart.$decouplingColor = decouplingColor;
-  degChart.update();
 }
 
 async function renderDegTable() {
@@ -422,44 +474,48 @@ async function renderDegTable() {
   const models = degModelsSelected(document.getElementById("deg-model").value);
   const corruption = degCorruptionKey(document.getElementById("deg-corruption").value);
   const method = degRecalMethod();
-  const severities = [1, 2, 3, 4, 5];
 
   const rows = models.map(model => {
-    const eceSeries = [];
-    const mapSeries = [];
-    severities.forEach(s => {
-      const row = calibrationData.find(
-        r => r.model === model && r.condition === `${corruption}_S${s}` && r.confidence_type === method
-      );
-      eceSeries.push(row ? row.ece : null);
-      mapSeries.push(row ? row.map50 : null);
-    });
-    const s5Row = calibrationData.find(
-      r => r.model === model && r.condition === `${corruption}_S5` && r.confidence_type === method
-    );
-    const lookup = DECOUPLING_LOOKUP[model][corruption];
-    const decSeverity = computeDecouplingSeverity(eceSeries, mapSeries, severities);
+    const { ece, map } = degSeries(model, corruption, method);
+    const { rho, p } = degSpearman(ece, map);
+    const status = decouplingStatus(rho, p);
     return {
       model: model === "yolov8" ? "YOLOv8" : "RT-DETR",
-      rho: lookup.rho,
-      status: lookup.status,
-      decSeverity,
-      ece5: s5Row ? s5Row.ece : null,
-      map5: s5Row ? s5Row.map50 : null,
-      bad: lookup.status === "Decoupled",
+      rho,
+      p,
+      status,
+      decSeverity: status.decoupled ? computeDecouplingSeverity(ece, map, DEG_SEVERITIES) : null,
+      ece5: ece[4],
+      map5: map[4],
     };
   });
+
+  const fmtP = p => (p == null ? "—" : p < 0.0005 ? "<0.001" : p.toFixed(4));
 
   const tbody = document.querySelector("#deg-table tbody");
   tbody.innerHTML = rows.map(r => `
     <tr>
       <td>${r.model}</td>
-      <td>${r.rho.toFixed(4)}<span style="color:#8a8a8a;font-size:0.85em"> (TS)</span></td>
-      <td>${r.bad && r.decSeverity != null ? "S" + r.decSeverity : "—"}<span style="color:#8a8a8a;font-size:0.85em"> (live, ${method === "dcn" ? "post-DCN" : "pre-recal"})</span></td>
+      <td>${r.rho != null ? r.rho.toFixed(4) : "—"}</td>
+      <td>${fmtP(r.p)}</td>
+      <td>${r.rho == null ? "—" : r.status.significant ? "Significant" : "Not significant"}</td>
+      <td>${r.decSeverity != null ? "S" + r.decSeverity : "—"}</td>
       <td>${r.ece5 != null ? fmt(r.ece5) : "—"}</td>
       <td>${r.map5 != null ? r.map5.toFixed(3) : "—"}</td>
-      <td class="${r.bad ? "status-bad" : "status-good"}">${r.bad ? "Decoupled — dangerous" : "Stable / Coupled"}<span style="color:#8a8a8a;font-size:0.85em"> (TS)</span></td>
+      <td class="${r.status.decoupled ? "status-bad" : "status-good"}">${r.status.label}</td>
     </tr>`).join("");
+
+  document.getElementById("deg-note").innerHTML = `
+    <b>Basis:</b> all values use <b>${DEG_METHOD_NAMES[method]}</b> confidences.
+    ρ is the Spearman rank correlation between mAP@0.50 and ECE across S1–S5;
+    p is two-sided (scipy.stats.spearmanr). With five severity levels,
+    |ρ| ≥ 0.878 is needed for significance at α = ${ALPHA}; "n.s." means not significant.<br />
+    <b>Status (proposal rule):</b> negative ρ = Coupled (accuracy and calibration
+    degrade together); near-zero or positive ρ = Decoupled (calibration degrades
+    independently of accuracy).<br />
+    <b>Decoupling severity</b> is a visual aid, not a measure defined in the proposal:
+    the severity step where the normalized ECE and mAP trends diverge most. It is
+    shown only for Decoupled curves.`;
 }
 
 function updateDegradationPage() {
@@ -479,6 +535,15 @@ document.getElementById("deg-recalib-toggle")?.addEventListener("click", e => {
 updateDegradationPage();
 
 // ---------- Page 2: benchmark explorer table (REAL DATA, pivoted) ----------
+// Every row of calibration_results.json is (model, condition, confidence_type).
+// The pivot below folds the three confidence types (raw / ts / dcn) into one
+// row per (model, condition) so each metric can be shown side by side.
+// The clean baselines are pinned at the top of the table and are never
+// filtered out (Appendix 4); averages and deltas use OOD rows only.
+const METRIC_LABELS = { ece: "ECE", mce: "MCE", dece: "D-ECE", map50: "mAP@0.50" };
+const METHODS = ["raw", "ts", "dcn"];
+const METHOD_NAMES = { raw: "Raw", ts: "TS", dcn: "DCN" };
+
 function conditionLabel(row) {
   if (row.condition === "clean") return "Clean (baseline)";
   return row.corruption_type
@@ -487,11 +552,14 @@ function conditionLabel(row) {
     .join(" ");
 }
 
-// Group the flat 126-row dataset into one row per (model, condition),
-// carrying raw / ts / dcn ECE side by side. MCE, D-ECE, mAP@0.50 are
-// taken from the raw confidence_type row, consistent with the rest of
-// this study's tables (e.g. Table 9/10), which report those three
-// against the uncalibrated baseline.
+function modelName(key) {
+  return key === "yolov8" ? "YOLOv8" : "RT-DETR";
+}
+
+// Optimized Temperature Scaling parameter, one per model (learned on the
+// validation logits in Stage 4). Fill in from the training log.
+const TEMPERATURE_LOOKUP = { yolov8: null, rtdetr: null };
+
 function pivotByCondition(rows) {
   const groups = {};
   for (const r of rows) {
@@ -504,66 +572,54 @@ function pivotByCondition(rows) {
         severity: r.severity,
       };
     }
-    groups[key][`ece_${r.confidence_type}`] = r.ece;
-    if (r.confidence_type === "raw") {
-      groups[key].mce = r.mce;
-      groups[key].dece = r.dece;
-      groups[key].map50 = r.map50;
+    const g = groups[key];
+    Object.keys(METRIC_LABELS).forEach(m => {
+      g[`${m}_${r.confidence_type}`] = r[m];
+    });
+    // Optimized temperature: only meaningful on the TS row. Requires the
+    // export to include a "temperature" field; otherwise the column shows "—".
+    if (r.confidence_type === "ts") {
+      g.temperature = r.temperature ?? TEMPERATURE_LOOKUP[r.model] ?? null;
     }
   }
   return Object.values(groups);
 }
 
-function applyExplorerFilters(pivoted) {
+function selectedMetric() {
+  const label = document.getElementById("f-metric").value;
+  return Object.keys(METRIC_LABELS).find(k => METRIC_LABELS[k] === label) || "ece";
+}
+
+function modelMatches(r) {
   const model = document.getElementById("f-model").value;
+  if (model === "YOLOv8") return r.model === "yolov8";
+  if (model === "RT-DETR") return r.model === "rtdetr";
+  return true;
+}
+
+function applyExplorerFilters(pivoted) {
   const corruption = document.getElementById("f-corruption").value;
   const severity = document.getElementById("f-severity").value;
 
   return pivoted.filter(r => {
-    if (model === "YOLOv8" && r.model !== "yolov8") return false;
-    if (model === "RT-DETR" && r.model !== "rtdetr") return false;
+    if (r.condition === "clean") return false; // clean baselines are pinned separately
+    if (!modelMatches(r)) return false;
 
     if (corruption !== "All types") {
       const wanted = corruption.toLowerCase().replace(/\s+/g, "_");
-      if (r.condition === "clean" || r.corruption_type !== wanted) return false;
+      if (r.corruption_type !== wanted) return false;
     }
-
-    if (severity !== "All") {
-      if (r.condition === "clean" || String(r.severity) !== severity) return false;
-    }
-
+    if (severity !== "All" && String(r.severity) !== severity) return false;
     return true;
   });
 }
 
-// The Recalibration filter narrows WHICH ece column(s) are shown,
-// rather than which rows -- since each pivoted row already carries
-// all three methods for direct comparison, matching how Tables 14/15
-// present this data in the thesis itself.
+// The Recalibration filter narrows WHICH method columns are populated,
+// not which rows exist; "All" shows raw, TS and DCN together.
 function visibleMethods() {
   const recal = document.getElementById("f-recal").value;
   const map = { "Raw": ["raw"], "Temp. scaling": ["ts"], "DentalCalib-Net": ["dcn"] };
-  return map[recal] || ["raw", "ts", "dcn"];
-}
-
-function computeBaselineAvg(pivoted, methods) {
-  const model = document.getElementById("f-model").value;
-  const cleanRows = pivoted.filter(r => {
-    if (r.condition !== "clean") return false;
-    if (model === "YOLOv8" && r.model !== "yolov8") return false;
-    if (model === "RT-DETR" && r.model !== "rtdetr") return false;
-    return true;
-  });
-  const vals = [];
-  cleanRows.forEach(r => methods.forEach(m => {
-    if (r[`ece_${m}`] != null) vals.push(r[`ece_${m}`]);
-  }));
-  return {
-    ece: vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null,
-    mce: cleanRows.length ? cleanRows.reduce((s, r) => s + r.mce, 0) / cleanRows.length : null,
-    dece: cleanRows.length ? cleanRows.reduce((s, r) => s + r.dece, 0) / cleanRows.length : null,
-    map50: cleanRows.length ? cleanRows.reduce((s, r) => s + r.map50, 0) / cleanRows.length : null,
-  };
+  return map[recal] || METHODS;
 }
 
 function deltaCaption(current, baseline, metricName, higherIsWorse = true) {
@@ -571,7 +627,46 @@ function deltaCaption(current, baseline, metricName, higherIsWorse = true) {
   const diff = current - baseline;
   const cls = (diff > 0) === higherIsWorse ? "bad" : "good";
   const sign = diff >= 0 ? "+" : "";
-  return { text: `${sign}${diff.toFixed(3)} vs baseline`, cls };
+  return { text: `${sign}${diff.toFixed(3)} vs clean baseline`, cls };
+}
+
+const showVal = v => (v == null ? "—" : fmt(v));
+
+// ΔECE / ΔMCE / ΔD-ECE = |OOD - clean| for the same model and method, as
+// defined in the proposal. mAP is not a calibration metric and has no
+// proposal-defined delta, so it is shown as the signed change (OOD - clean).
+function deltaOf(metric, value, base) {
+  if (value == null || base == null) return null;
+  return metric === "map50" ? value - base : Math.abs(value - base);
+}
+
+function showDelta(metric, d) {
+  if (d == null) return "—";
+  if (metric === "map50") return `${d >= 0 ? "+" : ""}${d.toFixed(3)}`;
+  return fmt(d);
+}
+
+function explorerRowHtml(r, metric, shownMethods, base, pinnedClass) {
+  const cls = pinnedClass ? ` class="pinned-row ${pinnedClass}"` : "";
+  const val = m => (shownMethods.includes(m) ? showVal(r[`${metric}_${m}`]) : "—");
+  const dlt = m => {
+    if (pinnedClass || !base || !shownMethods.includes(m)) return "—";
+    return showDelta(metric, deltaOf(metric, r[`${metric}_${m}`], base[`${metric}_${m}`]));
+  };
+  const t = r.temperature != null ? r.temperature.toFixed(3) : "—";
+  return `
+    <tr${cls}>
+      <td>${modelName(r.model)}</td>
+      <td>${conditionLabel(r)}</td>
+      <td>${r.condition === "clean" ? "—" : "S" + r.severity}</td>
+      <td>${val("raw")}</td>
+      <td>${val("ts")}</td>
+      <td>${val("dcn")}</td>
+      <td>${dlt("raw")}</td>
+      <td>${dlt("ts")}</td>
+      <td>${dlt("dcn")}</td>
+      <td>${t}</td>
+    </tr>`;
 }
 
 async function renderResultsTable() {
@@ -579,82 +674,72 @@ async function renderResultsTable() {
   const pivoted = pivotByCondition(raw);
   const filtered = applyExplorerFilters(pivoted);
   const methods = visibleMethods();
+  const metric = selectedMetric();
+  const metricLabel = METRIC_LABELS[metric];
   const tbody = document.querySelector("#results-table tbody");
 
-  if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9">No rows match the selected filters.</td></tr>`;
-    return;
-  }
+  const cleanByModel = {};
+  pivoted.filter(r => r.condition === "clean").forEach(r => { cleanByModel[r.model] = r; });
 
-  const cell = (row, method) =>
-    methods.includes(method) && row[`ece_${method}`] != null
-      ? fmt(row[`ece_${method}`])
-      : "—";
+  // Column headers follow the selected metric
+  METHODS.forEach(m => {
+    document.getElementById(`th-${m}`).textContent = `${metricLabel} (${METHOD_NAMES[m]})`;
+    document.getElementById(`th-d${m}`).textContent = `Δ${metricLabel} (${METHOD_NAMES[m]})`;
+  });
 
-  tbody.innerHTML = filtered.map(r => `
-    <tr>
-      <td>${r.model === "yolov8" ? "YOLOv8" : "RT-DETR"}</td>
-      <td>${conditionLabel(r)}</td>
-      <td>${r.condition === "clean" ? "—" : "S" + r.severity}</td>
-      <td>${cell(r, "raw")}</td>
-      <td>${cell(r, "ts")}</td>
-      <td>${cell(r, "dcn")}</td>
-      <td>${fmt(r.mce)}</td>
-      <td>${fmt(r.dece)}</td>
-      <td>${r.map50.toFixed(2)}</td>
-    </tr>`).join("");
+  // Pinned clean-baseline rows: always visible, all three methods shown
+  const pinned = ["yolov8", "rtdetr"]
+    .filter(m => cleanByModel[m])
+    .map((m, i) => explorerRowHtml(cleanByModel[m], metric, METHODS, null, `p${i + 1}`))
+    .join("");
 
-  // Stat cards: average ECE across the currently visible method(s) only
-  const eceVals = [];
-  filtered.forEach(r => methods.forEach(m => {
-    if (r[`ece_${m}`] != null) eceVals.push(r[`ece_${m}`]);
-  }));
-  const avg = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
+  const body = filtered.length
+    ? filtered.map(r => explorerRowHtml(r, metric, methods, cleanByModel[r.model], "")).join("")
+    : `<tr><td colspan="10">No OOD rows match the selected filters.</td></tr>`;
 
-  const baseline = computeBaselineAvg(pivoted, methods);
-  const avgEce = eceVals.length ? avg(eceVals) : null;
-  const avgMce = avg(filtered.map(r => r.mce));
-  const avgDece = avg(filtered.map(r => r.dece));
-  const avgMap = avg(filtered.map(r => r.map50));
+  tbody.innerHTML = pinned + body;
 
-  document.getElementById("avg-ece").textContent = avgEce != null ? fmt(avgEce) : "—";
-  document.getElementById("avg-mce").textContent = fmt(avgMce);
-  document.getElementById("avg-dece").textContent = fmt(avgDece);
-  document.getElementById("avg-map").textContent = fmt(avgMap);
+  // Summary cards: average over the filtered OOD rows for the selected method.
+  // With Recalibration = All the main value is Raw, and TS / DCN averages are
+  // listed underneath. Deltas compare against the clean baseline of the same
+  // method (and the same model filter).
+  const avg = arr => (arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null);
+  const cardMethod = methods.length === 1 ? methods[0] : "raw";
 
-  const eceDelta = avgEce != null ? deltaCaption(avgEce, baseline.ece, "ECE") : { text: "—", cls: "" };
-  const mceDelta = deltaCaption(avgMce, baseline.mce, "MCE");
-  const deceDelta = deltaCaption(avgDece, baseline.dece, "D-ECE");
-  const mapDelta = deltaCaption(avgMap, baseline.map50, "mAP@0.50", false); // higher mAP is better, so higherIsWorse=false
+  [
+    { m: "ece", v: "avg-ece", d: "ece-delta", worse: true },
+    { m: "mce", v: "avg-mce", d: "mce-delta", worse: true },
+    { m: "dece", v: "avg-dece", d: "dece-delta", worse: true },
+    { m: "map50", v: "avg-map", d: "map-delta", worse: false },
+  ].forEach(({ m, v, d, worse }) => {
+    const mean = key => avg(filtered.map(r => r[`${m}_${key}`]).filter(x => x != null));
+    const main = mean(cardMethod);
+    const base = avg(
+      pivoted
+        .filter(r => r.condition === "clean" && modelMatches(r))
+        .map(r => r[`${m}_${cardMethod}`])
+        .filter(x => x != null)
+    );
 
-  document.getElementById("ece-delta").textContent = eceDelta.text;
-  document.getElementById("ece-delta").className = `stat-delta ${eceDelta.cls}`;
-  document.getElementById("mce-delta").textContent = mceDelta.text;
-  document.getElementById("mce-delta").className = `stat-delta ${mceDelta.cls}`;
-  document.getElementById("dece-delta").textContent = deceDelta.text;
-  document.getElementById("dece-delta").className = `stat-delta ${deceDelta.cls}`;
-  document.getElementById("map-delta").textContent = mapDelta.text;
-  document.getElementById("map-delta").className = `stat-delta ${mapDelta.cls}`;
+    let text = "—";
+    let cls = "";
+    if (main != null) {
+      if (methods.length === 1) {
+        const c = deltaCaption(main, base, METRIC_LABELS[m], worse);
+        text = `${METHOD_NAMES[cardMethod]}: ${c.text}`;
+        cls = c.cls;
+      } else {
+        text = `Raw · TS ${showVal(mean("ts"))} · DCN ${showVal(mean("dcn"))}`;
+      }
+    }
+    document.getElementById(v).textContent = main != null ? fmt(main) : "—";
+    document.getElementById(d).textContent = text;
+    document.getElementById(d).className = `stat-delta ${cls}`;
+  });
 }
 
 renderResultsTable();
 document.getElementById("applyFilters")?.addEventListener("click", renderResultsTable);
-
-// -------- NLL data (REAL DATA, raw/TS only -- DCN excluded per Stage 4 methodology) --------
-let nllData = null;
-
-async function loadNllData() {
-  if (nllData) return nllData;
-  try {
-    const res = await fetch(dataUrl("nll_results.json"));
-    if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
-    nllData = await res.json();
-  } catch (err) {
-    console.error("Failed to load nll_results.json:", err);
-    nllData = {};
-  }
-  return nllData;
-}
 
 // ---------- Page 1: upload + run inference ----------
 const dropzone = document.getElementById("dropzone");
@@ -720,6 +805,7 @@ function resetAuditorResults() {
     "yolo-ece", "yolo-mce", "yolo-dece", "rtdetr-ece", "rtdetr-mce", "rtdetr-dece",
     "s1-yolo", "s1-rt", "s2-yolo", "s2-rt", "s3-yolo", "s3-rt",
     "s1-delta", "s2-delta", "s3-delta", "yolo-chart-note", "rtdetr-chart-note",
+    "yolo-n", "yolo-vs-raw", "rtdetr-n", "rtdetr-vs-raw",
   ].forEach(id => {
     const element = document.getElementById(id);
     element.textContent = "—";
@@ -816,7 +902,7 @@ function auditorConditionKey(label, severity) {
     "Gaussian noise": "gaussian_noise",
     "Motion blur": "motion_blur",
     "JPEG compression": "jpeg_compression",
-    "Pixel exposure": "brightness_variation",
+    "Brightness variation": "brightness_variation",
   };
   const base = map[label];
   return base ? `${base}_S${severity}` : "clean";
@@ -846,6 +932,42 @@ function betterModelDelta(yoloVal, rtVal, label) {
   const better = diff < 0 ? "RT-DETR" : diff > 0 ? "YOLOv8" : null;
   if (better === null) return { text: `Tied (${label})`, cls: "" };
   return { text: `${better} ${diff.toFixed(3)} better`, cls: "good" };
+}
+
+// Appendix 4: delta indicator showing ECE and MCE improvement relative to raw,
+// plus the detection count, because per-image metrics on a handful of boxes
+// are noisy and should not be read like the test-set benchmark numbers.
+// Display-only: boxes below this score are not drawn. The metrics always use
+// every saved detection, so they stay comparable to the benchmark numbers.
+const DISPLAY_MIN_CONF = 0.25;
+
+function showRecalDelta(prefix, method, raw, current, nDetections, nShown) {
+  const nEl = document.getElementById(`${prefix}-n`);
+  const dEl = document.getElementById(`${prefix}-vs-raw`);
+
+  nEl.textContent = nDetections
+    ? `Metrics use all ${nDetections} detections; ${nShown} drawn (confidence ≥ ${DISPLAY_MIN_CONF})`
+    : "No detections in this image";
+
+  if (method === "raw") {
+    dEl.textContent = "Raw confidences (reference)";
+    dEl.className = "stat-delta";
+    return;
+  }
+  if (raw.ece == null || current.ece == null) {
+    dEl.textContent = "—";
+    dEl.className = "stat-delta";
+    return;
+  }
+  const phrase = (name, rawV, curV) => {
+    const d = rawV - curV; // positive = error went down
+    if (Math.abs(d) < 0.0005) return `${name} unchanged`;
+    return `${name} ${d > 0 ? "improved" : "worsened"} by ${Math.abs(d).toFixed(3)}`;
+  };
+  const dE = raw.ece - current.ece;
+  const dM = raw.mce - current.mce;
+  dEl.textContent = `${phrase("ECE", raw.ece, current.ece)} · ${phrase("MCE", raw.mce, current.mce)} vs raw`;
+  dEl.className = `stat-delta ${dE > 0 && dM > 0 ? "good" : dE < 0 && dM < 0 ? "bad" : ""}`;
 }
 
 function summarizeImagePredictions(predictions, confidenceField, nBins = 15) {
@@ -973,8 +1095,14 @@ async function runAuditorInference() {
   rtNoteEl.textContent = rtNote.text;
   rtNoteEl.className = `chart-note ${rtNote.cls}`;
 
-  drawImageWithBoxes("canvas-yolo", imagePath, yoloPreds, 0.1, confField);
-  drawImageWithBoxes("canvas-rtdetr", imagePath, rtPreds, 0.1, confField);
+  drawImageWithBoxes("canvas-yolo", imagePath, yoloPreds, DISPLAY_MIN_CONF, confField);
+  drawImageWithBoxes("canvas-rtdetr", imagePath, rtPreds, DISPLAY_MIN_CONF, confField);
+
+  const rawYolo = method === "raw" ? yoloMetrics : summarizeImagePredictions(yoloPreds, "confidence_raw");
+  const rawRt = method === "raw" ? rtMetrics : summarizeImagePredictions(rtPreds, "confidence_raw");
+  const shown = preds => preds.filter(p => p[confField] >= DISPLAY_MIN_CONF).length;
+  showRecalDelta("yolo", method, rawYolo, yoloMetrics, yoloPreds.length, shown(yoloPreds));
+  showRecalDelta("rtdetr", method, rawRt, rtMetrics, rtPreds.length, shown(rtPreds));
 }
 
 document.getElementById("runInference")?.addEventListener("click", () => {
@@ -999,3 +1127,39 @@ loadTestImageList().catch(error => {
     "Auditor data is missing. Copy frontend/data and frontend/images from the shared dataset, then open this page over HTTP.";
 });
 setupImageModal();
+
+// ---------- Auditor: condition description panel (Appendix 4) ----------
+const CONDITION_INFO = {
+  "None (clean)": {
+    what: "Original test image with no corruption applied. This is the in-distribution baseline.",
+    analog: "A well-exposed, correctly positioned, properly processed panoramic radiograph.",
+  },
+  "Gaussian noise": {
+    what: "Random per-pixel intensity noise added to the image.",
+    analog: "Quantum mottle from low-dose exposure, or electronic noise from an aging or poorly maintained sensor.",
+  },
+  "Motion blur": {
+    what: "Directional smearing of the image along one axis.",
+    analog: "Patient movement during the scan, or an unstable head position.",
+  },
+  "JPEG compression": {
+    what: "Lossy re-compression that introduces blocking and ringing artifacts.",
+    analog: "Images re-saved or transmitted at low quality between clinics, PACS exports or messaging apps.",
+  },
+  "Brightness variation": {
+    what: "Global shift in image brightness.",
+    analog: "Over- or under-exposure from wrong exposure settings or inconsistent machine calibration across clinics.",
+  },
+};
+
+function updateConditionInfo() {
+  const label = document.getElementById("oodCondition").value;
+  const info = CONDITION_INFO[label];
+  const box = document.getElementById("cond-info");
+  const slider = document.getElementById("severity");
+  slider.disabled = label === "None (clean)";
+  if (!info) { box.innerHTML = ""; return; }
+  box.innerHTML = `<b>${label}</b>${info.what}<div class="analog">Clinical analog: ${info.analog}</div>`;
+}
+document.getElementById("oodCondition")?.addEventListener("change", updateConditionInfo);
+updateConditionInfo();
