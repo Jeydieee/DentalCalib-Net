@@ -404,6 +404,16 @@ const decouplingLinePlugin = {
   },
 };
 
+// Severity-range filter (Appendix 4). Affects the plotted points only.
+// Returns indices into DEG_SEVERITIES; swaps the ends if From > To.
+function degRange() {
+  const a = DEG_SEVERITIES.indexOf(Number(document.getElementById("deg-sev-from")?.value ?? DEG_SEVERITIES[0]));
+  const b = DEG_SEVERITIES.indexOf(Number(document.getElementById("deg-sev-to")?.value ?? DEG_SEVERITIES[DEG_SEVERITIES.length - 1]));
+  const lo = Math.max(0, Math.min(a, b));
+  const hi = Math.max(a, b) < 0 ? DEG_SEVERITIES.length - 1 : Math.max(a, b);
+  return { lo, hi };
+}
+
 async function renderDegradationChart() {
   await loadCalibrationData();
 
@@ -413,6 +423,8 @@ async function renderDegradationChart() {
   const colors = { yolov8: "#C4501E", rtdetr: "#1E6E63" };
   const datasets = [];
   const markers = [];
+  const { lo, hi } = degRange();
+  const minSev = DEG_SEVERITIES[lo], maxSev = DEG_SEVERITIES[hi];
 
   models.forEach(model => {
     const { ece, map } = degSeries(model, corruption, method);
@@ -420,7 +432,7 @@ async function renderDegradationChart() {
 
     datasets.push({
       label: `${label} ECE`,
-      data: ece,
+      data: ece.slice(lo, hi + 1),
       borderColor: colors[model],
       backgroundColor: colors[model],
       yAxisID: "y",
@@ -428,7 +440,7 @@ async function renderDegradationChart() {
     });
     datasets.push({
       label: `${label} mAP@0.50`,
-      data: map,
+      data: map.slice(lo, hi + 1),
       borderColor: colors[model],
       backgroundColor: colors[model],
       borderDash: [5, 3],
@@ -436,11 +448,12 @@ async function renderDegradationChart() {
       tension: 0.2,
     });
 
-    // The decoupling marker is drawn only for curves whose status is Decoupled.
+    // The decoupling marker is drawn only for curves whose status is Decoupled,
+    // and only if its severity is inside the plotted range.
     const { rho, p } = degSpearman(ece, map);
     if (decouplingStatus(rho, p).decoupled) {
       const severity = computeDecouplingSeverity(ece, map, DEG_SEVERITIES);
-      if (severity != null) {
+      if (severity != null && severity >= minSev && severity <= maxSev) {
         markers.push({ severity, color: colors[model], text: `${label}: decoupling point (S${severity})` });
       }
     }
@@ -450,7 +463,7 @@ async function renderDegradationChart() {
   if (degChart) degChart.destroy();
   degChart = new Chart(ctx, {
     type: "line",
-    data: { labels: DEG_SEVERITIES, datasets },
+    data: { labels: DEG_SEVERITIES.slice(lo, hi + 1), datasets },
     options: {
       responsive: true,
       scales: {
@@ -509,7 +522,9 @@ async function renderDegTable() {
     <b>Basis:</b> all values use <b>${DEG_METHOD_NAMES[method]}</b> confidences.
     ρ is the Spearman rank correlation between mAP@0.50 and ECE across S1–S5;
     p is two-sided (scipy.stats.spearmanr). With five severity levels,
-    |ρ| ≥ 0.878 is needed for significance at α = ${ALPHA}.<br />
+    |ρ| ≥ 0.878 is needed for significance at α = ${ALPHA}.
+    The severity range filter changes only the plotted curves; ρ, p and the
+    status above always use S1–S5.<br />
     <b>Status (as in Table 18):</b> p ≥ α is <b>Stable</b> (no statistically detectable
     mAP–ECE relationship; this label is the authors' own and is not defined in the
     proposal text). With p &lt; α, a negative ρ is <b>Coupled</b> (accuracy and calibration
