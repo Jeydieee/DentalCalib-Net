@@ -40,11 +40,53 @@ body {
   color: var(--sidebar-ink);
   display: flex;
   flex-direction: column;
-  padding: 28px 20px;
   position: sticky;
   top: 0;
   height: 100vh;
+  overflow: hidden;
+  transition: width 0.25s ease;
 }
+
+.sidebar-inner {
+  width: 240px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 20px;
+  transition: opacity 0.2s ease;
+}
+
+.app.sidebar-collapsed .sidebar { width: 0; }
+.app.sidebar-collapsed .sidebar-inner { opacity: 0; visibility: hidden; }
+
+.sidebar-toggle {
+  position: fixed;
+  top: 20px;
+  left: 228px;
+  z-index: 20;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-ink);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: left 0.25s ease, background 0.15s ease;
+}
+
+.sidebar-toggle:hover { background: var(--primary); }
+.sidebar-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.sidebar-toggle svg { transition: transform 0.25s ease; }
+
+.app.sidebar-collapsed .sidebar-toggle { left: 12px; }
+.app.sidebar-collapsed .sidebar-toggle svg { transform: rotate(180deg); }
+/* keep the floating button clear of page content when collapsed */
+.app.sidebar-collapsed .main { padding-left: 52px; }
 
 .brand-name {
   font-size: 19px;

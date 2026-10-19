@@ -8,9 +8,30 @@
     <link rel="icon" href="data:," />
   </head>
   <body>
-    <div class="app">
+    <div class="app" id="app">
+      <button
+        class="sidebar-toggle"
+        id="sidebarToggle"
+        type="button"
+        aria-controls="sidebar"
+        aria-expanded="true"
+        aria-label="Collapse sidebar"
+        title="Collapse sidebar"
+      >
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          <path
+            d="M15 5l-7 7 7 7"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
       <!-- ============ SIDEBAR ============ -->
-      <aside class="sidebar">
+      <aside class="sidebar" id="sidebar">
+       <div class="sidebar-inner">
         <div class="brand">
           <div class="brand-name">DentCalib</div>
           <div class="brand-sub">
@@ -44,6 +65,7 @@
             <span class="tag">20 OOD conditions (S1–S5)</span>
           </div>
         </div>
+       </div>
       </aside>
 
       <!-- ============ MAIN ============ -->
@@ -443,8 +465,8 @@
                 <option value="5" selected>S5</option>
               </select>
             </label>
-            <label class="field"
-              ><span>Recalibration</span>
+            <label class="field">
+              <span>Recalibration</span>
               <div class="toggle" id="deg-recalib-toggle">
                 <button class="toggle-opt active" data-mode="raw">Raw</button>
                 <button class="toggle-opt" data-mode="ts">TS</button>

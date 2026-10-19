@@ -41,6 +41,34 @@ navItems.forEach(btn => {
   });
 });
 
+// ---------- Collapsible sidebar ----------
+(() => {
+  const app = document.getElementById("app");
+  const toggle = document.getElementById("sidebarToggle");
+  const KEY = "dentcalib.sidebarCollapsed";
+
+  const setCollapsed = collapsed => {
+    app.classList.toggle("sidebar-collapsed", collapsed);
+    const label = collapsed ? "Expand sidebar" : "Collapse sidebar";
+    toggle.setAttribute("aria-expanded", String(!collapsed));
+    toggle.setAttribute("aria-label", label);
+    toggle.title = label;
+    try { localStorage.setItem(KEY, collapsed ? "1" : "0"); } catch {}
+  };
+
+  let saved = false;
+  try { saved = localStorage.getItem(KEY) === "1"; } catch {}
+  setCollapsed(saved);
+
+  toggle.addEventListener("click", () =>
+    setCollapsed(!app.classList.contains("sidebar-collapsed"))
+  );
+  // let Chart.js re-measure once the width transition finishes
+  document.getElementById("sidebar").addEventListener("transitionend", e => {
+    if (e.propertyName === "width") window.dispatchEvent(new Event("resize"));
+  });
+})();
+
 // ---------- Small helpers ----------
 const fmt = n => n.toFixed(3);
 
