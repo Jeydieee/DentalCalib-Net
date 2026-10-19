@@ -714,6 +714,22 @@ function explorerRowHtml(r, metric, shownMethods, base, pinnedClass) {
     </tr>`;
 }
 
+// Keep both tables at the same scroll position (vertical and horizontal).
+function syncPaneScroll(cards) {
+  cards.forEach(card => {
+    if (card.dataset.synced) return;
+    card.dataset.synced = "1";
+    card.addEventListener("scroll", () => {
+      // Writing an equal value fires no scroll event, so this cannot loop.
+      cards.forEach(other => {
+        if (other === card) return;
+        if (other.scrollTop !== card.scrollTop) other.scrollTop = card.scrollTop;
+        if (other.scrollLeft !== card.scrollLeft) other.scrollLeft = card.scrollLeft;
+      });
+    });
+  });
+}
+
 async function renderResultsTable() {
   const raw = await loadCalibrationData();
   const pivoted = pivotByCondition(raw);
@@ -721,28 +737,42 @@ async function renderResultsTable() {
   const methods = visibleMethods();
   const metric = selectedMetric();
   const metricLabel = METRIC_LABELS[metric];
-  const tbody = document.querySelector("#results-table tbody");
-
   const cleanByModel = {};
   pivoted.filter(r => r.condition === "clean").forEach(r => { cleanByModel[r.model] = r; });
 
-  // Column headers follow the selected metric
+  // Column headers follow the selected metric (every pane has its own header row)
   METHODS.forEach(m => {
-    document.getElementById(`th-${m}`).textContent = `${metricLabel} (${METHOD_NAMES[m]})`;
-    document.getElementById(`th-d${m}`).textContent = `Δ${metricLabel} (${METHOD_NAMES[m]})`;
+    document.querySelectorAll(`.th-${m}`).forEach(th => {
+      th.textContent = `${metricLabel} (${METHOD_NAMES[m]})`;
+    });
+    document.querySelectorAll(`.th-d${m}`).forEach(th => {
+      th.textContent = `Δ${metricLabel} (${METHOD_NAMES[m]})`;
+    });
   });
 
   // Pinned clean-baseline rows: always visible, all three methods shown
-  const pinned = ["yolov8", "rtdetr"]
+  const pinnedFor = models => models
     .filter(m => cleanByModel[m])
     .map((m, i) => explorerRowHtml(cleanByModel[m], metric, METHODS, null, `p${i + 1}`))
     .join("");
-
-  const body = filtered.length
-    ? filtered.map(r => explorerRowHtml(r, metric, methods, cleanByModel[r.model], "")).join("")
+  const bodyFor = rows => rows.length
+    ? rows.map(r => explorerRowHtml(r, metric, methods, cleanByModel[r.model], "")).join("")
     : `<tr><td colspan="10">No OOD rows match the selected filters.</td></tr>`;
 
-  tbody.innerHTML = pinned + body;
+  // "All models" splits YOLOv8 and RT-DETR into two side-by-side tables so
+  // they can be compared row by row; a single model keeps one full-width table.
+  const split = document.getElementById("f-model").value === "All models";
+  const panes = [
+    { el: document.getElementById("pane-a"), models: split ? ["yolov8"] : ["yolov8", "rtdetr"], rows: split ? filtered.filter(r => r.model === "yolov8") : filtered },
+    { el: document.getElementById("pane-b"), models: ["rtdetr"], rows: filtered.filter(r => r.model === "rtdetr") },
+  ];
+  document.getElementById("results-split").classList.toggle("is-split", split);
+  panes[1].el.hidden = !split;
+  panes.forEach(p => {
+    p.el.querySelector(".table-pane-title").hidden = !split;
+    p.el.querySelector("tbody").innerHTML = pinnedFor(p.models) + bodyFor(p.rows);
+  });
+  syncPaneScroll(panes.map(p => p.el.querySelector(".table-card")));
 
   // Summary cards: average over the filtered OOD rows for the selected method.
   // With Recalibration = All the main value is Raw, and TS / DCN averages are

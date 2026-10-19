@@ -564,12 +564,12 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 }
 
 /* ===== Benchmark Explorer: scrollable results table ===== */
-.table-card:has(#results-table) {
+.table-card.results {
   max-height: 450px;
   overflow-y: auto;
 }
 
-.table-card:has(#results-table) thead th {
+.table-card.results thead th {
   position: sticky;
   top: 0;
   background: #F0EEE7;
@@ -612,21 +612,21 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 }
 
 /* ===== Benchmark Explorer: method-coded headers + pinned clean rows ===== */
-#results-table thead th { height: 40px; }
-.table-card:has(#results-table) thead th { z-index: 3; }
-#results-table thead th.m-raw { box-shadow: inset 0 3px 0 #C4501E; }
-#results-table thead th.m-ts  { box-shadow: inset 0 3px 0 #3F5F8F; }
-#results-table thead th.m-dcn { box-shadow: inset 0 3px 0 #1E6E63; }
+.results-table thead th { height: 40px; }
+.table-card.results thead th { z-index: 3; }
+.results-table thead th.m-raw { box-shadow: inset 0 3px 0 #C4501E; }
+.results-table thead th.m-ts  { box-shadow: inset 0 3px 0 #3F5F8F; }
+.results-table thead th.m-dcn { box-shadow: inset 0 3px 0 #1E6E63; }
 
-#results-table tbody tr.pinned-row td {
+.results-table tbody tr.pinned-row td {
   position: sticky;
   z-index: 2;
   height: 36px;
   background: #EAF3F1;
   font-weight: 600;
 }
-#results-table tbody tr.pinned-row.p1 td { top: 40px; }
-#results-table tbody tr.pinned-row.p2 td { top: 76px; box-shadow: 0 1px 0 var(--primary); }
+.results-table tbody tr.pinned-row.p1 td { top: 40px; }
+.results-table tbody tr.pinned-row.p2 td { top: 76px; box-shadow: 0 1px 0 var(--primary); }
 
 /* ===== Pipeline page: parallel branches + labelled feature groups ===== */
 .pipeline-split {
@@ -725,3 +725,58 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 }
 .cond-info b { display: block; margin-bottom: 2px; }
 .cond-info .analog { margin-top: 4px; opacity: 0.75; }
+/* ===== Benchmark Explorer: side-by-side YOLOv8 / RT-DETR tables ===== */
+.results-split { display: block; }
+.results-split.is-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.table-pane[hidden], .table-pane-title[hidden] { display: none; }
+.table-pane-title {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+/* the Model column is redundant once each table is titled */
+.results-split.is-split .results-table th:first-child,
+.results-split.is-split .results-table td:first-child { display: none; }
+.results-split.is-split .results-table { font-size: 12px; }
+.results-split.is-split .results-table th,
+.results-split.is-split .results-table td { padding-left: 8px; padding-right: 8px; }
+@media (max-width: 1100px) {
+  .results-split.is-split { grid-template-columns: 1fr; }
+}
+
+/* ===== Benchmark Explorer: first column stays put on horizontal scroll ===== */
+/* Single table: Model is first. Split view hides Model, so Condition is first. */
+.results-table th:first-child,
+.results-table td:first-child,
+.results-split.is-split .results-table th:nth-child(2),
+.results-split.is-split .results-table td:nth-child(2) {
+  position: sticky;
+  left: 0;
+}
+.results-table tbody td:first-child,
+.results-split.is-split .results-table tbody td:nth-child(2) {
+  background: var(--card-bg);
+  z-index: 1;
+}
+.results-split.is-split .results-table tbody td:first-child { background: none; z-index: auto; }
+.results-table thead th:first-child,
+.results-split.is-split .results-table thead th:nth-child(2) { z-index: 5; }
+.results-split.is-split .results-table thead th:first-child { z-index: 3; }
+.results-table tbody tr.pinned-row td:first-child,
+.results-split.is-split .results-table tbody tr.pinned-row td:nth-child(2) { z-index: 4; }
+.results-split.is-split .results-table tbody tr.pinned-row td:first-child { z-index: 2; }
+/* divider so scrolled cells read as passing under the fixed column */
+.results-table th:first-child,
+.results-table td:first-child,
+.results-split.is-split .results-table th:nth-child(2),
+.results-split.is-split .results-table td:nth-child(2) {
+  border-right: 1px solid var(--border);
+}
+.results-split.is-split .results-table th:first-child,
+.results-split.is-split .results-table td:first-child { border-right: 0; }

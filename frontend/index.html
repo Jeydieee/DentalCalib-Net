@@ -319,26 +319,55 @@
             </div>
           </div>
 
-          <div class="card table-card">
-            <table id="results-table">
-              <thead>
-                <tr>
-                  <th>Model</th>
-                  <th>Condition</th>
-                  <th>Sev.</th>
-                  <th class="m-raw" id="th-raw">ECE (Raw)</th>
-                  <th class="m-ts" id="th-ts">ECE (TS)</th>
-                  <th class="m-dcn" id="th-dcn">ECE (DCN)</th>
-                  <th class="m-raw" id="th-draw">ΔECE (Raw)</th>
-                  <th class="m-ts" id="th-dts">ΔECE (TS)</th>
-                  <th class="m-dcn" id="th-ddcn">ΔECE (DCN)</th>
-                  <th>T</th>
-                </tr>
-              </thead>
-              <tbody>
-                <!-- populated by script.js -->
-              </tbody>
-            </table>
+          <div class="results-split" id="results-split">
+            <div class="table-pane" id="pane-a">
+              <h3 class="table-pane-title">YOLOv8</h3>
+              <div class="card table-card results">
+                <table class="results-table">
+                  <thead>
+                    <tr>
+                      <th>Model</th>
+                      <th>Condition</th>
+                      <th>Sev.</th>
+                      <th class="m-raw th-raw">ECE (Raw)</th>
+                      <th class="m-ts th-ts">ECE (TS)</th>
+                      <th class="m-dcn th-dcn">ECE (DCN)</th>
+                      <th class="m-raw th-draw">ΔECE (Raw)</th>
+                      <th class="m-ts th-dts">ΔECE (TS)</th>
+                      <th class="m-dcn th-ddcn">ΔECE (DCN)</th>
+                      <th>T</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- populated by script.js -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="table-pane" id="pane-b">
+              <h3 class="table-pane-title">RT-DETR</h3>
+              <div class="card table-card results">
+                <table class="results-table">
+                  <thead>
+                    <tr>
+                      <th>Model</th>
+                      <th>Condition</th>
+                      <th>Sev.</th>
+                      <th class="m-raw th-raw">ECE (Raw)</th>
+                      <th class="m-ts th-ts">ECE (TS)</th>
+                      <th class="m-dcn th-dcn">ECE (DCN)</th>
+                      <th class="m-raw th-draw">ΔECE (Raw)</th>
+                      <th class="m-ts th-dts">ΔECE (TS)</th>
+                      <th class="m-dcn th-ddcn">ΔECE (DCN)</th>
+                      <th>T</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- populated by script.js -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </section>
 
