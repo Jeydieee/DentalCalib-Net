@@ -101,14 +101,20 @@
               style="margin-top: 8px; font-weight: 600; color: var(--primary)"
             ></div>
           </div>
-          <div class="sim-note">
-            <span class="sim-chip">REAL DATA</span>
-            Only images from the 201-image DENTEX test partition have
-            precomputed results. Uploading any other image will show an error
-            rather than fabricated numbers. This page does not run model
-            inference on arbitrary uploads. ECE, MCE, and D-ECE are calculated
-            from the selected image's saved detections and IoU values.
-          </div>
+          <details class="data-note">
+            <summary>
+              <span class="sim-chip">REAL DATA</span> About this data
+            </summary>
+            <p>
+              Only images from the 201-image DENTEX test partition have
+              precomputed results. Uploading any other image will show an
+              error rather than fabricated numbers. This page does not run
+              model inference on arbitrary uploads. ECE, MCE, and D-ECE are
+              calculated from the selected image's saved detections and IoU
+              values. The tooth number within the quadrant is not stored in
+              the exported predictions.
+            </p>
+          </details>
 
           <div class="controls-row">
             <label class="field">
@@ -136,13 +142,14 @@
             <button class="btn-primary" id="runInference">Show results</button>
           </div>
           <div class="cond-info" id="cond-info"></div>
-                    <div class="sim-note">
-            Box labels show the FDI quadrant (Q1–Q4) and the raw confidence.
-            Green boxes matched a ground-truth box at IoU ≥ 0.50; orange boxes
-            did not. The tooth number within the quadrant is not stored in the
-            exported predictions.
+
+          <div class="box-legend" aria-label="Box colour legend">
+            <span><i class="swatch good"></i>Matched a ground-truth box (IoU ≥ 0.50)</span>
+            <span><i class="swatch bad"></i>No match</span>
+            <span class="legend-sep">Labels: FDI quadrant (Q1–Q4) · raw confidence</span>
           </div>
 
+          <div class="model-compare">
           <!-- YOLOv8 row: image | data | graph -->
           <div class="card model-card">
             <div class="card-title">YOLOv8 — One-stage anchor-free</div>
@@ -154,7 +161,7 @@
                   height="640"
                   style="width: 100%; height: 100%; object-fit: contain"
                 ></canvas>
-                <span class="placeholder">OPG image</span>
+                <span class="placeholder">Upload an image to begin</span>
               </div>
               <div class="model-metrics">
                 <div class="metric-item">
@@ -173,6 +180,7 @@
                 <div class="chart-label">Reliability diagram</div>
                 <div class="chart-wrap">
                   <canvas id="chart-rel-yolo" height="160"></canvas>
+                  <div class="chart-empty">Reliability diagram appears after you show results</div>
                 </div>
                 <div class="chart-note" id="yolo-chart-note">—</div>
               </div>
@@ -190,7 +198,7 @@
                   height="640"
                   style="width: 100%; height: 100%; object-fit: contain"
                 ></canvas>
-                <span class="placeholder">OPG image</span>
+                <span class="placeholder">Upload an image to begin</span>
               </div>
               <div class="model-metrics">
                 <div class="metric-item">
@@ -209,10 +217,13 @@
                 <div class="chart-label">Reliability diagram</div>
                 <div class="chart-wrap">
                   <canvas id="chart-rel-rtdetr" height="160"></canvas>
+                  <div class="chart-empty">Reliability diagram appears after you show results</div>
                 </div>
                 <div class="chart-note" id="rtdetr-chart-note">—</div>
               </div>
             </div>
+          </div>
+
           </div>
 
           <div class="grid-3 stat-strip">

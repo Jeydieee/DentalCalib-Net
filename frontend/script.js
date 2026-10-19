@@ -869,12 +869,19 @@ fileInput.addEventListener("change", e => {
 
 let selectedFilename = null;
 
+// Auditor empty / loading / ready states ------------------------------
+const modelCards = () => document.querySelectorAll(".model-card");
+function setPreviewMessage(text) {
+  document.querySelectorAll(".opg-preview .placeholder").forEach(p => (p.textContent = text));
+}
+
 async function handleUploadedFile(file) {
   try {
     await loadTestImageList();
   } catch (error) {
     selectedFilename = null;
     resetAuditorResults();
+    setPreviewMessage("Auditor data unavailable");
     console.error("Auditor data is unavailable:", error);
     document.getElementById("upload-status").textContent =
       "Auditor data is missing. Copy frontend/data and frontend/images from the shared dataset, then open this page over HTTP.";
@@ -886,14 +893,17 @@ async function handleUploadedFile(file) {
     resetAuditorResults();
     document.getElementById("upload-status").textContent =
       `No saved results for "${file.name}". Use an image from the 201-image DENTEX test set with its original filename.`;
+    setPreviewMessage("No saved results for this image");
     return;
   }
   selectedFilename = file.name;
   document.getElementById("upload-status").textContent = `✓ Uploaded: ${file.name}`;
   resetAuditorResults();
+  setPreviewMessage("Ready — press “Show results”");
 }
 
 function resetAuditorResults() {
+  modelCards().forEach(c => c.classList.remove("has-results", "is-loading"));
   ["canvas-yolo", "canvas-rtdetr"].forEach(id => {
     const canvas = document.getElementById(id);
     canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
@@ -1208,16 +1218,32 @@ async function runAuditorInference() {
 
 document.getElementById("runInference")?.addEventListener("click", () => {
   const btn = document.getElementById("runInference");
+
+  // Nothing chosen yet: say so and point at the drop zone instead of doing nothing.
+  if (!selectedFilename) {
+    document.getElementById("upload-status").textContent =
+      "Choose an image from the DENTEX test set first.";
+    dropzone.classList.remove("nudge");
+    void dropzone.offsetWidth; // restart the animation
+    dropzone.classList.add("nudge");
+    dropzone.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
   const originalText = btn.textContent;
   btn.textContent = "Loading…";
   btn.disabled = true;
-  runAuditorInference().catch(error => {
+  modelCards().forEach(c => c.classList.add("is-loading"));
+  runAuditorInference().then(() => {
+    modelCards().forEach(c => c.classList.add("has-results"));
+  }).catch(error => {
     console.error("Auditor results could not be loaded:", error);
     document.getElementById("upload-status").textContent =
       `Could not load the selected condition's saved results: ${error.message}`;
   }).finally(() => {
     btn.textContent = originalText;
     btn.disabled = false;
+    modelCards().forEach(c => c.classList.remove("is-loading"));
     document.querySelector(".card-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 });

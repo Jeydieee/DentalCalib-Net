@@ -248,7 +248,7 @@ body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 44px 20px;
+  padding: 28px 20px;
   border: 1.5px dashed var(--border);
   cursor: pointer;
   transition: border-color .15s ease, background .15s ease;
@@ -805,3 +805,117 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 }
 .results-table td.d-bad { color: var(--alert); }
 .results-table td.d-good { color: var(--good); }
+
+/* ===== Live OPG Auditor: less scrolling ===== */
+.data-note {
+  margin: -6px 0 16px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.data-note summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+.data-note summary::-webkit-details-marker { display: none; }
+.data-note summary::after { content: "▾"; font-size: 10px; transition: transform 0.15s ease; }
+.data-note[open] summary::after { transform: rotate(180deg); }
+.data-note p { margin: 8px 0 0; line-height: 1.6; max-width: 90ch; }
+
+.box-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 0 0 14px;
+}
+.box-legend .swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border: 2px solid;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+.swatch.good { border-color: var(--good); }
+.swatch.bad { border-color: var(--alert); }
+
+/* controls stay reachable while reading the results below */
+.controls-row {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  background: var(--bg);
+  margin: 0 -8px 12px;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.card-title { scroll-margin-top: 110px; }
+
+/* wide screens: YOLOv8 and RT-DETR side by side */
+@media (min-width: 1450px) {
+  .model-compare {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+  .model-compare .model-card { margin-bottom: 0; }
+  .model-compare .model-row {
+    grid-template-columns: minmax(0, 1fr) 140px;
+    gap: 20px;
+    align-items: start;
+  }
+  .model-compare .model-row .opg-preview { max-width: 380px; }
+  .model-compare .model-metrics { align-self: stretch; padding: 0 0 0 20px; border-right: 0; }
+  .model-compare .model-chart { grid-column: 1 / -1; display: block; }
+  .model-compare .model-chart .chart-wrap { flex: none; height: 240px; min-height: 0; }
+  .model-compare + .stat-strip { margin-top: 16px; }
+}
+
+/* ===== Live OPG Auditor: empty, loading and nudge states ===== */
+.chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-soft);
+  pointer-events: none;
+}
+.model-card.has-results .chart-empty,
+.model-card.is-loading .chart-empty { display: none; }
+
+.model-card.is-loading .opg-preview,
+.model-card.is-loading .chart-wrap { position: relative; overflow: hidden; }
+.model-card.is-loading .opg-preview::after,
+.model-card.is-loading .chart-wrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.65), transparent);
+  transform: translateX(-100%);
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+.model-card.is-loading .metric-item b,
+.model-card.is-loading .chart-note { opacity: 0.35; }
+@keyframes shimmer { to { transform: translateX(100%); } }
+
+.upload-card.nudge { animation: nudge 0.5s ease; border-color: var(--alert); }
+@keyframes nudge {
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .model-card.is-loading .opg-preview::after,
+  .model-card.is-loading .chart-wrap::after,
+  .upload-card.nudge { animation: none; }
+}
