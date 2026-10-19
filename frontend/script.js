@@ -80,6 +80,18 @@ function diagonalDataset() {
   };
 }
 
+// One colour per recalibration method, used on every page (keep in sync with
+// --m-raw / --m-ts / --m-dcn in style.css).
+const METHOD_COLORS = { raw: "#C4501E", ts: "#3F5F8F", dcn: "#1E6E63" };
+
+// Mix a hex colour towards white (amount 0..1); used to tell RT-DETR from YOLOv8
+// on charts where both models share the selected method's colour.
+function tint(hex, amount) {
+  const n = parseInt(hex.slice(1), 16);
+  const mix = c => Math.round(c + (255 - c) * amount);
+  return `rgb(${mix(n >> 16)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`;
+}
+
 const chartRegistry = {};
 
 function reliabilityChart(canvasId, bins, color) {
@@ -133,12 +145,12 @@ async function loadCalibrationData() {
   return calibrationData;
 }
 
-reliabilityChart("chart-rel-yolo", [], "#C4501E");
-reliabilityChart("chart-rel-rtdetr", [], "#2F7D4F");
+reliabilityChart("chart-rel-yolo", [], METHOD_COLORS.raw);
+reliabilityChart("chart-rel-rtdetr", [], METHOD_COLORS.raw);
 
 // Page 3: reliability viewer chart objects (created once, updated by refreshReliabilityViewer)
-let rvRawChart = reliabilityChart("chart-rv-raw", [], "#C4501E");
-let rvRecalChart = reliabilityChart("chart-rv-recal", [], "#1E6E63");
+let rvRawChart = reliabilityChart("chart-rv-raw", [], METHOD_COLORS.raw);
+let rvRecalChart = reliabilityChart("chart-rv-recal", [], METHOD_COLORS.dcn);
 
 // ---------- Reliability bin data (REAL DATA) ----------
 let reliabilityBinData = null;
@@ -189,7 +201,11 @@ async function refreshReliabilityViewer() {
   const methodLabel = document.getElementById("rv-method").value;
   const recalMethod = methodLabel === "DentalCalib-Net" ? "dcn" : "ts";
 
-  document.getElementById("rv-recal-title").textContent = `${methodLabel} — after recalibration`;
+  const recalTitle = document.getElementById("rv-recal-title");
+  recalTitle.textContent = `${methodLabel} — after recalibration`;
+  recalTitle.dataset.method = recalMethod;
+  const recalSeries = rvRecalChart.data.datasets[1];
+  recalSeries.borderColor = recalSeries.backgroundColor = METHOD_COLORS[recalMethod];
 
   const rawBins = lookupBins(model, condition, "raw");
   const recalBins = lookupBins(model, condition, recalMethod);
@@ -439,7 +455,8 @@ async function renderDegradationChart() {
   const models = degModelsSelected(document.getElementById("deg-model").value);
   const corruption = degCorruptionKey(document.getElementById("deg-corruption").value);
   const method = degRecalMethod();
-  const colors = { yolov8: "#C4501E", rtdetr: "#1E6E63" };
+  const colors = { yolov8: METHOD_COLORS[method], rtdetr: tint(METHOD_COLORS[method], 0.5) };
+  const pointStyles = { yolov8: "circle", rtdetr: "rectRot" };
   const datasets = [];
   const markers = [];
   const { lo, hi } = degRange();
@@ -454,6 +471,7 @@ async function renderDegradationChart() {
       data: ece.slice(lo, hi + 1),
       borderColor: colors[model],
       backgroundColor: colors[model],
+      pointStyle: pointStyles[model],
       yAxisID: "y",
       tension: 0.2,
     });
@@ -463,6 +481,7 @@ async function renderDegradationChart() {
       borderColor: colors[model],
       backgroundColor: colors[model],
       borderDash: [5, 3],
+      pointStyle: pointStyles[model],
       yAxisID: "y1",
       tension: 0.2,
     });
@@ -485,6 +504,20 @@ async function renderDegradationChart() {
     data: { labels: DEG_SEVERITIES.slice(lo, hi + 1), datasets },
     options: {
       responsive: true,
+      interaction: { mode: "index", intersect: false },
+      onHover: (e, items) => { e.native.target.style.cursor = items.length ? "pointer" : "default"; },
+      onClick: (e, items, chart) => {
+        const hit = chart.getElementsAtEventForMode(e, "index", { intersect: false }, true)[0];
+        if (!hit) return;
+        const severity = chart.data.labels[hit.index];
+        const corruptionLabel = document.getElementById("deg-corruption").value;
+        const recal = { raw: "None (raw)", ts: "Temperature scaling", dcn: "DentalCalib-Net" }[degRecalMethod()];
+        location.hash = pageHash("auditor", {
+          oodCondition: corruptionLabel,
+          severity,
+          recalMethod: recal,
+        });
+      },
       scales: {
         x: { title: { display: true, text: "OOD severity" }, grid: { display: false } },
         // Both axes start at zero so neither series is visually exaggerated.
@@ -670,6 +703,10 @@ function deltaCaption(current, baseline, metricName, higherIsWorse = true) {
   return { text: `${sign}${diff.toFixed(3)} vs clean baseline`, cls };
 }
 
+// Method name with its colour dot (same colours as the table headers and charts)
+const methodTag = (m, value) =>
+  `<span class="m-tag" data-method="${m}">${METHOD_NAMES[m]}${value != null ? " " + value : ""}</span>`;
+
 const showVal = v => (v == null ? "—" : fmt(v));
 
 // ΔECE / ΔMCE / ΔD-ECE = |OOD - clean| for the same model and method, as
@@ -699,11 +736,48 @@ function bestMethods(r, metric, shownMethods) {
   return winners.length === vals.length ? [] : winners;
 }
 
+const RV_CONDITION_LABELS = {
+  gaussian_noise: "Gaussian noise",
+  motion_blur: "Motion blur",
+  brightness_variation: "Brightness variation",
+  jpeg_compression: "JPEG compression",
+};
+
+const RV_METHOD_LABELS = { ts: "Temperature scaling", dcn: "DentalCalib-Net" };
+
+// Reliability Viewer URL for this row's model / condition. The Viewer would
+// otherwise fall back to Temperature scaling, so the method is always named:
+// the clicked column's method, else the Explorer's recalibration filter, else
+// DentalCalib-Net (the method this project is about).
+function reliabilityHref(r, method) {
+  const recal = document.getElementById("f-recal").value;
+  const chosen =
+    method ||
+    (recal === "Temp. scaling" ? "ts" : "dcn");
+  const params = {
+    "rv-model": modelName(r.model),
+    "rv-condition": r.condition === "clean" ? "Clean (baseline)" : RV_CONDITION_LABELS[r.corruption_type],
+  };
+  if (r.condition !== "clean") params["rv-severity"] = r.severity;
+  params["rv-method"] = RV_METHOD_LABELS[chosen];
+  return pageHash("reliability", params).replace(/&/g, "&amp;");
+}
+
+function reliabilityLink(r) {
+  const href = reliabilityHref(r);
+  const name = `${modelName(r.model)} ${conditionLabel(r)}${r.condition === "clean" ? "" : " S" + r.severity}`;
+  return `<a class="row-link" href="${href}" title="Open the reliability diagram" aria-label="Open the reliability diagram for ${name}">↗</a>`;
+}
+
 function explorerRowHtml(r, metric, shownMethods, base, pinnedClass) {
   const cls = pinnedClass ? ` class="pinned-row ${pinnedClass}"` : "";
   const best = pinnedClass ? [] : bestMethods(r, metric, shownMethods);
   const val = m => {
-    const text = shownMethods.includes(m) ? showVal(r[`${metric}_${m}`]) : "—";
+    let text = shownMethods.includes(m) ? showVal(r[`${metric}_${m}`]) : "—";
+    // TS and DCN values open that method's reliability diagram
+    if (text !== "—" && m !== "raw") {
+      text = `<a class="cell-link" href="${reliabilityHref(r, m)}" title="Open the ${METHOD_NAMES[m]} reliability diagram">${text}</a>`;
+    }
     return best.includes(m) ? `<td class="best" title="Best ${METRIC_LABELS[metric]} in this row">${text}</td>` : `<td>${text}</td>`;
   };
   // The displayed delta follows the proposal (|OOD - clean|, signed for mAP);
@@ -724,7 +798,7 @@ function explorerRowHtml(r, metric, shownMethods, base, pinnedClass) {
   return `
     <tr${cls}>
       <td>${modelName(r.model)}</td>
-      <td>${conditionLabel(r)}</td>
+      <td class="cond-cell">${conditionLabel(r)} ${reliabilityLink(r)}</td>
       <td>${r.condition === "clean" ? "—" : "S" + r.severity}</td>
       ${val("raw")}
       ${val("ts")}
@@ -762,13 +836,23 @@ async function renderResultsTable() {
   const cleanByModel = {};
   pivoted.filter(r => r.condition === "clean").forEach(r => { cleanByModel[r.model] = r; });
 
-  // Column headers follow the selected metric (every pane has its own header row)
+  // "All models" splits YOLOv8 and RT-DETR into two side-by-side tables so
+  // they can be compared row by row; a single model keeps one full-width table.
+  const split = document.getElementById("f-model").value === "All models";
+
+  // Column headers follow the selected metric (every pane has its own header row).
+  // Split tables are narrow, so they use short headers (Raw / TS / DCN) and the
+  // metric name moves into each table's title; the full name stays as a tooltip.
   METHODS.forEach(m => {
+    const full = `${metricLabel} (${METHOD_NAMES[m]})`;
+    const fullDelta = `Δ${metricLabel} (${METHOD_NAMES[m]})`;
     document.querySelectorAll(`.th-${m}`).forEach(th => {
-      th.textContent = `${metricLabel} (${METHOD_NAMES[m]})`;
+      th.textContent = split ? METHOD_NAMES[m] : full;
+      th.title = full;
     });
     document.querySelectorAll(`.th-d${m}`).forEach(th => {
-      th.textContent = `Δ${metricLabel} (${METHOD_NAMES[m]})`;
+      th.textContent = split ? `Δ${METHOD_NAMES[m]}` : fullDelta;
+      th.title = fullDelta;
     });
   });
 
@@ -781,9 +865,6 @@ async function renderResultsTable() {
     ? rows.map(r => explorerRowHtml(r, metric, methods, cleanByModel[r.model], "")).join("")
     : `<tr><td colspan="10">No OOD rows match the selected filters.</td></tr>`;
 
-  // "All models" splits YOLOv8 and RT-DETR into two side-by-side tables so
-  // they can be compared row by row; a single model keeps one full-width table.
-  const split = document.getElementById("f-model").value === "All models";
   const panes = [
     { el: document.getElementById("pane-a"), models: split ? ["yolov8"] : ["yolov8", "rtdetr"], rows: split ? filtered.filter(r => r.model === "yolov8") : filtered },
     { el: document.getElementById("pane-b"), models: ["rtdetr"], rows: filtered.filter(r => r.model === "rtdetr") },
@@ -791,7 +872,9 @@ async function renderResultsTable() {
   document.getElementById("results-split").classList.toggle("is-split", split);
   panes[1].el.hidden = !split;
   panes.forEach(p => {
-    p.el.querySelector(".table-pane-title").hidden = !split;
+    const title = p.el.querySelector(".table-pane-title");
+    title.hidden = !split;
+    title.textContent = `${modelName(p.el.id === "pane-a" ? "yolov8" : "rtdetr")} — ${metricLabel}`;
     p.el.querySelector("tbody").innerHTML = pinnedFor(p.models) + bodyFor(p.rows);
   });
   syncPaneScroll(panes.map(p => p.el.querySelector(".table-card")));
@@ -823,14 +906,14 @@ async function renderResultsTable() {
     if (main != null) {
       if (methods.length === 1) {
         const c = deltaCaption(main, base, METRIC_LABELS[m], worse);
-        text = `${METHOD_NAMES[cardMethod]}: ${c.text}`;
+        text = `${methodTag(cardMethod)}: ${c.text}`;
         cls = c.cls;
       } else {
-        text = `Raw · TS ${showVal(mean("ts"))} · DCN ${showVal(mean("dcn"))}`;
+        text = `${methodTag("raw")} · ${methodTag("ts", showVal(mean("ts")))} · ${methodTag("dcn", showVal(mean("dcn")))}`;
       }
     }
     document.getElementById(v).textContent = main != null ? fmt(main) : "—";
-    document.getElementById(d).textContent = text;
+    document.getElementById(d).innerHTML = text;
     document.getElementById(d).className = `stat-delta ${cls}`;
   });
 }
@@ -869,6 +952,13 @@ fileInput.addEventListener("change", e => {
 
 let selectedFilename = null;
 
+// kind: "info" (default), "ok", "warn" or "error"; colours live in style.css
+function setUploadStatus(text, kind = "info") {
+  const status = document.getElementById("upload-status");
+  status.textContent = text;
+  status.className = `upload-sub upload-status ${kind}`;
+}
+
 // Auditor empty / loading / ready states ------------------------------
 const modelCards = () => document.querySelectorAll(".model-card");
 function setPreviewMessage(text) {
@@ -883,21 +973,25 @@ async function handleUploadedFile(file) {
     resetAuditorResults();
     setPreviewMessage("Auditor data unavailable");
     console.error("Auditor data is unavailable:", error);
-    document.getElementById("upload-status").textContent =
-      "Auditor data is missing. Copy frontend/data and frontend/images from the shared dataset, then open this page over HTTP.";
+    setUploadStatus(
+      "Auditor data is missing. Copy frontend/data and frontend/images from the shared dataset, then open this page over HTTP.",
+      "error"
+    );
     return;
   }
 
   if (!testImageList.includes(file.name)) {
     selectedFilename = null;
     resetAuditorResults();
-    document.getElementById("upload-status").textContent =
-      `No saved results for "${file.name}". Use an image from the 201-image DENTEX test set with its original filename.`;
+    setUploadStatus(
+      `No saved results for "${file.name}". Use an image from the 201-image DENTEX test set with its original filename.`,
+      "error"
+    );
     setPreviewMessage("No saved results for this image");
     return;
   }
   selectedFilename = file.name;
-  document.getElementById("upload-status").textContent = `✓ Uploaded: ${file.name}`;
+  setUploadStatus(`✓ Uploaded: ${file.name}`, "ok");
   resetAuditorResults();
   setPreviewMessage("Ready — press “Show results”");
 }
@@ -921,8 +1015,8 @@ function resetAuditorResults() {
     element.className = element.className.replace(/\s(good|bad)\b/g, "");
   });
 
-  reliabilityChart("chart-rel-yolo", [], "#C4501E");
-  reliabilityChart("chart-rel-rtdetr", [], "#2F7D4F");
+  reliabilityChart("chart-rel-yolo", [], METHOD_COLORS.raw);
+  reliabilityChart("chart-rel-rtdetr", [], METHOD_COLORS.raw);
 }
 
 // ---------- Page 1: Live OPG Auditor (REAL per-image data) ----------
@@ -1194,8 +1288,8 @@ async function runAuditorInference() {
   document.getElementById("s3-delta").textContent = deceDelta.text;
   document.getElementById("s3-delta").className = `stat-delta ${deceDelta.cls}`;
 
-  reliabilityChart("chart-rel-yolo", binsToChartPoints(yoloMetrics.bins), "#C4501E");
-  reliabilityChart("chart-rel-rtdetr", binsToChartPoints(rtMetrics.bins), "#2F7D4F");
+  reliabilityChart("chart-rel-yolo", binsToChartPoints(yoloMetrics.bins), METHOD_COLORS[method]);
+  reliabilityChart("chart-rel-rtdetr", binsToChartPoints(rtMetrics.bins), METHOD_COLORS[method]);
 
   const yoloNote = calibrationInterpretation(yoloMetrics.bins);
   const rtNote = calibrationInterpretation(rtMetrics.bins);
@@ -1221,8 +1315,7 @@ document.getElementById("runInference")?.addEventListener("click", () => {
 
   // Nothing chosen yet: say so and point at the drop zone instead of doing nothing.
   if (!selectedFilename) {
-    document.getElementById("upload-status").textContent =
-      "Choose an image from the DENTEX test set first.";
+    setUploadStatus("Choose an image from the DENTEX test set first.", "warn");
     dropzone.classList.remove("nudge");
     void dropzone.offsetWidth; // restart the animation
     dropzone.classList.add("nudge");
@@ -1238,8 +1331,7 @@ document.getElementById("runInference")?.addEventListener("click", () => {
     modelCards().forEach(c => c.classList.add("has-results"));
   }).catch(error => {
     console.error("Auditor results could not be loaded:", error);
-    document.getElementById("upload-status").textContent =
-      `Could not load the selected condition's saved results: ${error.message}`;
+    setUploadStatus(`Could not load the selected condition's saved results: ${error.message}`, "error");
   }).finally(() => {
     btn.textContent = originalText;
     btn.disabled = false;
@@ -1250,8 +1342,10 @@ document.getElementById("runInference")?.addEventListener("click", () => {
 
 loadTestImageList().catch(error => {
   console.error("Auditor data is unavailable:", error);
-  document.getElementById("upload-status").textContent =
-    "Auditor data is missing. Copy frontend/data and frontend/images from the shared dataset, then open this page over HTTP.";
+  setUploadStatus(
+    "Auditor data is missing. Copy frontend/data and frontend/images from the shared dataset, then open this page over HTTP.",
+    "error"
+  );
 });
 setupImageModal();
 
@@ -1290,6 +1384,12 @@ function updateConditionInfo() {
 }
 document.getElementById("oodCondition")?.addEventListener("change", updateConditionInfo);
 updateConditionInfo();
+// Build an in-app link: pageHash("reliability", { "rv-model": "YOLOv8" }) -> "#reliability?rv-model=YOLOv8"
+function pageHash(page, params = {}) {
+  const q = new URLSearchParams(params).toString();
+  return `#${page}${q ? "?" + q : ""}`;
+}
+
 // ---------- Navigation: page + filter state live in the URL hash ----------
 // Format: #explorer?f-model=YOLOv8&f-metric=MCE. Only values that differ from
 // the page defaults are written, so links stay short. Back/forward, reloads and
@@ -1303,7 +1403,15 @@ updateConditionInfo();
     pipeline: [],
   };
   const REFRESH = {
-    auditor: () => updateConditionInfo(),
+    auditor: params => {
+      updateConditionInfo();
+      // arriving from a link (e.g. a Degradation point) with an image already
+      // chosen: show that condition straight away
+      if (params.toString() && selectedFilename) el("runInference")?.click();
+      else if (params.toString()) {
+        setUploadStatus("Choose an image to view the selected condition.");
+      }
+    },
     explorer: () => renderResultsTable(),
     reliability: () => refreshReliabilityViewer(),
     degradation: () => updateDegradationPage(),
@@ -1373,7 +1481,7 @@ updateConditionInfo();
       );
     }
     // data-backed pages need their saved results before they can draw
-    loadCalibrationData().catch(() => {}).finally(() => REFRESH[page]?.());
+    loadCalibrationData().catch(() => {}).finally(() => REFRESH[page]?.(params));
   }
 
   navItems.forEach(btn => {

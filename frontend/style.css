@@ -7,6 +7,10 @@
   --primary-dark: #16524A;
   --alert: #C4501E;
   --good: #2F7D4F;
+  /* recalibration methods: the same colour on every page */
+  --m-raw: #C4501E;
+  --m-ts: #3F5F8F;
+  --m-dcn: #1E6E63;
   --border: #E2DFD3;
   --card-bg: #FFFFFF;
   --sidebar-bg: #14231F;
@@ -161,8 +165,8 @@ body {
 /* ===== Main ===== */
 .main {
   flex: 1;
+  min-width: 0; /* let wide tables and charts shrink instead of widening the page */
   padding: 36px 28px 60px;
-  max-width: 1500px;
 }
 
 .page { display: none; }
@@ -466,7 +470,27 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .pipe-node.accent small { color: #CFE7E1; }
 
-.pipe-arrow { color: var(--ink-soft); font-size: 15px; }
+/* Stretchy line-and-head connector between pipeline stages */
+.pipe-arrow {
+  position: relative;
+  flex: 1 1 32px;
+  min-width: 28px;
+  max-width: 90px;
+  height: 2px;
+  background: var(--ink-soft);
+  opacity: 0.7;
+}
+.pipe-arrow::after {
+  content: "";
+  position: absolute;
+  right: 1px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid var(--ink-soft);
+  border-right: 2px solid var(--ink-soft);
+  transform: translateY(-50%) rotate(45deg);
+}
 
 .pipe-compare {
   background: #F0EEE7;
@@ -616,9 +640,9 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 /* ===== Benchmark Explorer: method-coded headers + pinned clean rows ===== */
 .results-table thead th { height: 40px; }
 .table-card.results thead th { z-index: 3; }
-.results-table thead th.m-raw { box-shadow: inset 0 3px 0 #C4501E; }
-.results-table thead th.m-ts  { box-shadow: inset 0 3px 0 #3F5F8F; }
-.results-table thead th.m-dcn { box-shadow: inset 0 3px 0 #1E6E63; }
+.results-table thead th.m-raw { box-shadow: inset 0 3px 0 var(--m-raw); }
+.results-table thead th.m-ts  { box-shadow: inset 0 3px 0 var(--m-ts); }
+.results-table thead th.m-dcn { box-shadow: inset 0 3px 0 var(--m-dcn); }
 
 .results-table tbody tr.pinned-row td {
   position: sticky;
@@ -919,3 +943,114 @@ button:focus-visible, select:focus-visible, input:focus-visible {
   .model-card.is-loading .chart-wrap::after,
   .upload-card.nudge { animation: none; }
 }
+
+/* ===== Method colours: toggle, titles, cross-page links ===== */
+.toggle-opt.active[data-mode="raw"] { background: var(--m-raw); }
+.toggle-opt.active[data-mode="ts"] { background: var(--m-ts); }
+.toggle-opt.active[data-mode="dcn"] { background: var(--m-dcn); }
+
+[data-method]::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--m-raw);
+}
+[data-method="ts"]::before { background: var(--m-ts); }
+[data-method="dcn"]::before { background: var(--m-dcn); }
+
+.cond-cell { white-space: nowrap; }
+.row-link {
+  margin-left: 4px;
+  color: var(--primary);
+  text-decoration: none;
+  font-family: var(--sans);
+  font-weight: 700;
+  opacity: 0.55;
+}
+.row-link:hover, .row-link:focus-visible { opacity: 1; text-decoration: underline; }
+
+.chart-hint {
+  margin: -4px 0 16px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.cell-link {
+  color: inherit;
+  text-decoration: underline dotted rgba(20, 35, 31, 0.35);
+  text-underline-offset: 3px;
+}
+.cell-link:hover, .cell-link:focus-visible { text-decoration-style: solid; color: var(--primary); }
+
+/* Pipeline diagram: spread the stages across the full page width */
+.pipeline-split { justify-content: space-between; }
+
+/* Auditor (side-by-side layout): metrics sit right beside the image and use the
+   remaining width instead of being pushed to the far edge of the card. */
+@media (min-width: 1450px) {
+  .model-compare .model-row {
+    grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+  }
+  .model-compare .model-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+    gap: 14px 16px;
+    align-content: center;
+    padding: 0 0 0 24px;
+    border-left: 1px solid var(--border);
+  }
+  .model-compare .model-metrics > .stat-delta,
+  .model-compare .model-metrics > .chart-note { grid-column: 1 / -1; }
+  .model-compare .metric-item b { font-size: 22px; }
+}
+
+/* Method tag in the Explorer summary cards */
+.m-tag { white-space: nowrap; }
+.m-tag[data-method]::before { width: 8px; height: 8px; margin-right: 5px; }
+
+/* ===== Auditor: upload status + preview canvas (formerly inline styles) ===== */
+.upload-status { margin-top: 8px; font-weight: 600; color: var(--primary); }
+.upload-status.ok { color: var(--good); }
+.upload-status.warn,
+.upload-status.error { color: var(--alert); }
+.opg-preview canvas { width: 100%; height: 100%; object-fit: contain; }
+
+/* ===== Filter bars stay reachable while scrolling a page ===== */
+.filter-bar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  box-shadow: 0 6px 10px -8px rgba(20, 35, 31, 0.25);
+}
+
+/* Feature chip tooltips (hover or keyboard focus) */
+.feature-chip[data-tip] { position: relative; cursor: help; }
+.feature-chip[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  width: max-content;
+  max-width: 260px;
+  padding: 7px 10px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.45;
+  border-radius: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 30;
+}
+.feature-chip[data-tip]:hover::after,
+.feature-chip[data-tip]:focus-visible::after { opacity: 1; }
+
+/* Split tables: tighter cells so all columns fit at laptop widths (~1366px) */
+.results-split.is-split .results-table th,
+.results-split.is-split .results-table td { padding-left: 5px; padding-right: 5px; }
+.results-split.is-split .results-table th { letter-spacing: 0; }

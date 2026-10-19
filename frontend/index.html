@@ -95,11 +95,7 @@
             <div class="upload-sub">
               JPG or PNG · must be from the DENTEX 2023 test set
             </div>
-            <div
-              class="upload-sub"
-              id="upload-status"
-              style="margin-top: 8px; font-weight: 600; color: var(--primary)"
-            ></div>
+            <div class="upload-sub upload-status" id="upload-status"></div>
           </div>
           <details class="data-note">
             <summary>
@@ -159,7 +155,6 @@
                   id="canvas-yolo"
                   width="640"
                   height="640"
-                  style="width: 100%; height: 100%; object-fit: contain"
                 ></canvas>
                 <span class="placeholder">Upload an image to begin</span>
               </div>
@@ -196,7 +191,6 @@
                   id="canvas-rtdetr"
                   width="640"
                   height="640"
-                  style="width: 100%; height: 100%; object-fit: contain"
                 ></canvas>
                 <span class="placeholder">Upload an image to begin</span>
               </div>
@@ -431,14 +425,14 @@
               ><span>Recalibration method</span>
               <select id="rv-method">
                 <option>Temperature scaling</option>
-                <option>DentalCalib-Net</option>
+                <option selected>DentalCalib-Net</option>
               </select>
             </label>
           </div>
 
           <div class="grid-2">
             <div class="card">
-              <div class="card-title">Raw — before recalibration</div>
+              <div class="card-title" data-method="raw">Raw — before recalibration</div>
               <canvas id="chart-rv-raw" height="180"></canvas>
               <div class="chart-metrics">
                 <span>ECE <b id="rv-raw-ece">—</b></span>
@@ -447,7 +441,7 @@
               </div>
             </div>
             <div class="card">
-              <div class="card-title" id="rv-recal-title">
+              <div class="card-title" id="rv-recal-title" data-method="dcn">
                 DentalCalib-Net — after recalibration
               </div>
               <canvas id="chart-rv-recal" height="180"></canvas>
@@ -525,6 +519,10 @@
           <div class="deg-chart-wrap">
             <canvas id="chart-degradation"></canvas>
           </div>
+          <p class="chart-hint">
+            Click a severity on the chart to open that condition in the Live
+            OPG Auditor.
+          </p>
 
           <div class="card table-card">
             <table id="deg-table">
@@ -562,13 +560,13 @@
             <div class="pipeline-label">A — End-to-end inference pipeline</div>
             <div class="pipeline-split">
               <div class="pipe-node">OPG image</div>
-              <div class="pipe-arrow">→</div>
+              <div class="pipe-arrow" aria-hidden="true"></div>
               <div class="pipe-branches">
                 <div class="pipe-branch">
                   <div class="pipe-node">
                     Selected detector<br /><small>YOLOv8 / RT-DETR</small>
                   </div>
-                  <div class="pipe-arrow">→</div>
+                  <div class="pipe-arrow" aria-hidden="true"></div>
                   <div class="pipe-node">
                     Detection outputs<br /><small>raw confidence · boxes · logits</small>
                   </div>
@@ -577,17 +575,17 @@
                   <div class="pipe-node">
                     Quality feature extraction<br /><small>per image</small>
                   </div>
-                  <div class="pipe-arrow">→</div>
+                  <div class="pipe-arrow" aria-hidden="true"></div>
                   <div class="pipe-node">
                     Quality features<br /><small>Laplacian variance · pixel σ · JPEG block score</small>
                   </div>
                 </div>
               </div>
-              <div class="pipe-arrow">→</div>
+              <div class="pipe-arrow" aria-hidden="true"></div>
               <div class="pipe-node accent">
                 DentalCalib-Net<br /><small>3-layer MLP · 8-dim input</small>
               </div>
-              <div class="pipe-arrow">→</div>
+              <div class="pipe-arrow" aria-hidden="true"></div>
               <div class="pipe-node">
                 Calibrated confidence<br /><small>one score per box</small>
               </div>
@@ -600,14 +598,14 @@
             </div>
             <div class="grid-2">
               <div class="pipe-compare">
-                <div class="compare-title">Temperature scaling</div>
+                <div class="compare-title" data-method="ts">Temperature scaling</div>
                 <p>
                   Fixed scalar T applied uniformly to all inputs. No sensitivity
                   to image or OOD severity.
                 </p>
               </div>
               <div class="pipe-compare">
-                <div class="compare-title">DentalCalib-Net</div>
+                <div class="compare-title" data-method="dcn">DentalCalib-Net</div>
                 <p>
                   Quality-conditioned correction, designed to apply larger
                   adjustments to degraded images and smaller ones to clean images.
@@ -620,20 +618,20 @@
             <div class="pipeline-label">C — 8-dimensional input vector</div>
             <div class="feature-group-label">Detection features (5)</div>
             <div class="feature-grid">
-              <span class="feature-chip">Raw confidence</span>
-              <span class="feature-chip">BBox width</span>
-              <span class="feature-chip">BBox height</span>
-              <span class="feature-chip">BBox center x</span>
-              <span class="feature-chip">BBox center y</span>
+              <span class="feature-chip" tabindex="0" data-tip="The detector's original confidence score for the box.">Raw confidence</span>
+              <span class="feature-chip" tabindex="0" data-tip="Width of the predicted bounding box.">BBox width</span>
+              <span class="feature-chip" tabindex="0" data-tip="Height of the predicted bounding box.">BBox height</span>
+              <span class="feature-chip" tabindex="0" data-tip="Horizontal position of the box centre in the radiograph.">BBox center x</span>
+              <span class="feature-chip" tabindex="0" data-tip="Vertical position of the box centre in the radiograph.">BBox center y</span>
             </div>
             <div class="feature-group-label">
               Image quality features (3): the quality-conditioning mechanism,
               absent from Temperature Scaling
             </div>
             <div class="feature-grid">
-              <span class="feature-chip quality">Laplacian variance (sharpness)</span>
-              <span class="feature-chip quality">Pixel σ (exposure / contrast)</span>
-              <span class="feature-chip quality">JPEG block score (compression)</span>
+              <span class="feature-chip quality" tabindex="0" data-tip="Image sharpness: low values mean a blurred image, e.g. motion blur.">Laplacian variance (sharpness)</span>
+              <span class="feature-chip quality" tabindex="0" data-tip="Spread of pixel intensities: reflects exposure and contrast.">Pixel σ (exposure / contrast)</span>
+              <span class="feature-chip quality" tabindex="0" data-tip="Strength of blocking artefacts typical of lossy JPEG compression.">JPEG block score (compression)</span>
             </div>
             <div class="invariant-note">
               Safety invariant: DentalCalib-Net modifies confidence scores only.
