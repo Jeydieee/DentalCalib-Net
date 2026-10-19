@@ -56,8 +56,9 @@ body {
   transition: opacity 0.2s ease;
 }
 
-.app.sidebar-collapsed .sidebar { width: 0; }
-.app.sidebar-collapsed .sidebar-inner { opacity: 0; visibility: hidden; }
+/* collapsed = 64px icon rail */
+.app.sidebar-collapsed .sidebar { width: 64px; }
+.app.sidebar-collapsed .sidebar-inner { width: 64px; padding: 28px 10px; }
 
 .sidebar-toggle {
   position: fixed;
@@ -83,10 +84,8 @@ body {
 
 .sidebar-toggle svg { transition: transform 0.25s ease; }
 
-.app.sidebar-collapsed .sidebar-toggle { left: 12px; }
+.app.sidebar-collapsed .sidebar-toggle { left: 51px; }
 .app.sidebar-collapsed .sidebar-toggle svg { transform: rotate(180deg); }
-/* keep the floating button clear of page content when collapsed */
-.app.sidebar-collapsed .main { padding-left: 52px; }
 
 .brand-name {
   font-size: 19px;
@@ -109,6 +108,9 @@ body {
 }
 
 .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   text-align: left;
   background: transparent;
   border: none;
@@ -780,3 +782,26 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 }
 .results-split.is-split .results-table th:first-child,
 .results-split.is-split .results-table td:first-child { border-right: 0; }
+
+/* ===== Sidebar: icons + collapsed icon rail ===== */
+.nav-icon { flex-shrink: 0; opacity: 0.85; }
+.nav-item.active .nav-icon { opacity: 1; }
+.nav-label { white-space: nowrap; }
+.brand-mark { display: none; }
+
+.app.sidebar-collapsed .brand-full,
+.app.sidebar-collapsed .brand-sub,
+.app.sidebar-collapsed .nav-label,
+.app.sidebar-collapsed .dataset-context { display: none; }
+.app.sidebar-collapsed .brand-mark { display: block; font-size: 16px; text-align: center; }
+.app.sidebar-collapsed .nav { margin-top: 28px; }
+.app.sidebar-collapsed .nav-item { justify-content: center; padding: 10px 0; }
+
+/* ===== Benchmark Explorer: best value + delta tone ===== */
+.results-table td.best {
+  background: #E3F0ED;
+  color: var(--primary-dark);
+  font-weight: 700;
+}
+.results-table td.d-bad { color: var(--alert); }
+.results-table td.d-good { color: var(--good); }

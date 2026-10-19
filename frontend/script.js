@@ -32,15 +32,6 @@ const dataUrl = path => new URL(path, DATA_ROOT);
 const navItems = document.querySelectorAll(".nav-item");
 const pages = document.querySelectorAll(".page");
 
-navItems.forEach(btn => {
-  btn.addEventListener("click", () => {
-    navItems.forEach(b => b.classList.remove("active"));
-    pages.forEach(p => p.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById(`page-${btn.dataset.page}`).classList.add("active");
-  });
-});
-
 // ---------- Collapsible sidebar ----------
 (() => {
   const app = document.getElementById("app");
@@ -568,13 +559,17 @@ function updateDegradationPage() {
   renderDegTable();
 }
 
-document.getElementById("deg-update")?.addEventListener("click", updateDegradationPage);
+// Filters apply as soon as they change; there is no separate "Update chart" button.
+["deg-model", "deg-corruption", "deg-sev-from", "deg-sev-to"].forEach(id => {
+  document.getElementById(id)?.addEventListener("change", updateDegradationPage);
+});
 
 document.getElementById("deg-recalib-toggle")?.addEventListener("click", e => {
   const opt = e.target.closest(".toggle-opt");
   if (!opt) return;
   document.querySelectorAll("#deg-recalib-toggle .toggle-opt").forEach(o => o.classList.remove("active"));
   opt.classList.add("active");
+  updateDegradationPage();
 });
 
 updateDegradationPage();
@@ -691,12 +686,39 @@ function showDelta(metric, d) {
   return fmt(d);
 }
 
+// Best value per row: lowest for the calibration errors, highest for mAP.
+// Ties across every shown method are not highlighted (nothing to compare).
+function bestMethods(r, metric, shownMethods) {
+  const vals = shownMethods
+    .map(m => [m, r[`${metric}_${m}`]])
+    .filter(([, v]) => v != null);
+  if (vals.length < 2) return [];
+  const pick = metric === "map50" ? Math.max : Math.min;
+  const best = pick(...vals.map(([, v]) => v));
+  const winners = vals.filter(([, v]) => v === best).map(([m]) => m);
+  return winners.length === vals.length ? [] : winners;
+}
+
 function explorerRowHtml(r, metric, shownMethods, base, pinnedClass) {
   const cls = pinnedClass ? ` class="pinned-row ${pinnedClass}"` : "";
-  const val = m => (shownMethods.includes(m) ? showVal(r[`${metric}_${m}`]) : "—");
+  const best = pinnedClass ? [] : bestMethods(r, metric, shownMethods);
+  const val = m => {
+    const text = shownMethods.includes(m) ? showVal(r[`${metric}_${m}`]) : "—";
+    return best.includes(m) ? `<td class="best" title="Best ${METRIC_LABELS[metric]} in this row">${text}</td>` : `<td>${text}</td>`;
+  };
+  // The displayed delta follows the proposal (|OOD - clean|, signed for mAP);
+  // its colour uses the signed change: orange = worse than clean, green = better.
   const dlt = m => {
-    if (pinnedClass || !base || !shownMethods.includes(m)) return "—";
-    return showDelta(metric, deltaOf(metric, r[`${metric}_${m}`], base[`${metric}_${m}`]));
+    if (pinnedClass || !base || !shownMethods.includes(m)) return "<td>—</td>";
+    const cur = r[`${metric}_${m}`];
+    const ref = base[`${metric}_${m}`];
+    const d = deltaOf(metric, cur, ref);
+    if (d == null) return "<td>—</td>";
+    const signed = cur - ref;
+    const worse = metric === "map50" ? signed < 0 : signed > 0;
+    const tone = signed === 0 ? "" : worse ? "d-bad" : "d-good";
+    const tip = `${METRIC_LABELS[metric]} ${fmt(ref)} (clean) → ${fmt(cur)}`;
+    return `<td class="${tone}" title="${tip}">${showDelta(metric, d)}</td>`;
   };
   const t = r.temperature != null ? r.temperature.toFixed(3) : "—";
   return `
@@ -704,12 +726,12 @@ function explorerRowHtml(r, metric, shownMethods, base, pinnedClass) {
       <td>${modelName(r.model)}</td>
       <td>${conditionLabel(r)}</td>
       <td>${r.condition === "clean" ? "—" : "S" + r.severity}</td>
-      <td>${val("raw")}</td>
-      <td>${val("ts")}</td>
-      <td>${val("dcn")}</td>
-      <td>${dlt("raw")}</td>
-      <td>${dlt("ts")}</td>
-      <td>${dlt("dcn")}</td>
+      ${val("raw")}
+      ${val("ts")}
+      ${val("dcn")}
+      ${dlt("raw")}
+      ${dlt("ts")}
+      ${dlt("dcn")}
       <td>${t}</td>
     </tr>`;
 }
@@ -814,7 +836,9 @@ async function renderResultsTable() {
 }
 
 renderResultsTable();
-document.getElementById("applyFilters")?.addEventListener("click", renderResultsTable);
+["f-model", "f-corruption", "f-severity", "f-recal", "f-metric"].forEach(id => {
+  document.getElementById(id)?.addEventListener("change", renderResultsTable);
+});
 
 // ---------- Page 1: upload + run inference ----------
 const dropzone = document.getElementById("dropzone");
@@ -1240,3 +1264,109 @@ function updateConditionInfo() {
 }
 document.getElementById("oodCondition")?.addEventListener("change", updateConditionInfo);
 updateConditionInfo();
+// ---------- Navigation: page + filter state live in the URL hash ----------
+// Format: #explorer?f-model=YOLOv8&f-metric=MCE. Only values that differ from
+// the page defaults are written, so links stay short. Back/forward, reloads and
+// shared links all restore the same page and filters.
+(() => {
+  const PAGE_CONTROLS = {
+    auditor: ["oodCondition", "severity", "recalMethod"],
+    explorer: ["f-model", "f-corruption", "f-severity", "f-recal", "f-metric"],
+    reliability: ["rv-model", "rv-condition", "rv-severity", "rv-method"],
+    degradation: ["deg-model", "deg-corruption", "deg-sev-from", "deg-sev-to"],
+    pipeline: [],
+  };
+  const REFRESH = {
+    auditor: () => updateConditionInfo(),
+    explorer: () => renderResultsTable(),
+    reliability: () => refreshReliabilityViewer(),
+    degradation: () => updateDegradationPage(),
+  };
+  const DEFAULT_PAGE = "auditor";
+  const DEG_MODE = "deg-mode"; // the Raw / TS / DCN toggle, not a form control
+
+  const el = id => document.getElementById(id);
+  const degMode = () =>
+    document.querySelector("#deg-recalib-toggle .toggle-opt.active")?.dataset.mode || "raw";
+
+  const defaults = {};
+  Object.values(PAGE_CONTROLS).flat().forEach(id => { defaults[id] = el(id)?.value; });
+  defaults[DEG_MODE] = degMode();
+
+  let currentPage = DEFAULT_PAGE;
+
+  function showPage(name) {
+    currentPage = name;
+    navItems.forEach(b => {
+      const on = b.dataset.page === name;
+      b.classList.toggle("active", on);
+      if (on) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
+    });
+    pages.forEach(p => p.classList.toggle("active", p.id === `page-${name}`));
+  }
+
+  function hashFor(page) {
+    const params = new URLSearchParams();
+    PAGE_CONTROLS[page].forEach(id => {
+      const v = el(id)?.value;
+      if (v != null && v !== defaults[id]) params.set(id, v);
+    });
+    if (page === "degradation" && degMode() !== defaults[DEG_MODE]) params.set(DEG_MODE, degMode());
+    const q = params.toString();
+    return `#${page}${q ? "?" + q : ""}`;
+  }
+
+  function writeHash(push) {
+    const hash = hashFor(currentPage);
+    if (hash === location.hash || (hash === `#${DEFAULT_PAGE}` && !location.hash)) return;
+    history[push ? "pushState" : "replaceState"](null, "", hash);
+  }
+
+  function parseHash() {
+    const [rawPage, query = ""] = location.hash.slice(1).split("?");
+    const page = rawPage in PAGE_CONTROLS ? rawPage : DEFAULT_PAGE;
+    return { page, params: new URLSearchParams(query) };
+  }
+
+  function applyHash() {
+    const { page, params } = parseHash();
+    showPage(page);
+    PAGE_CONTROLS[page].forEach(id => {
+      const node = el(id);
+      if (!node) return;
+      const wanted = params.get(id) ?? defaults[id];
+      // ignore values that are not valid options (stale or hand-edited links)
+      if (node.tagName === "SELECT" && ![...node.options].some(o => o.value === wanted)) return;
+      node.value = wanted;
+    });
+    if (page === "degradation") {
+      const mode = params.get(DEG_MODE) ?? defaults[DEG_MODE];
+      document.querySelectorAll("#deg-recalib-toggle .toggle-opt").forEach(o =>
+        o.classList.toggle("active", o.dataset.mode === mode)
+      );
+    }
+    // data-backed pages need their saved results before they can draw
+    loadCalibrationData().catch(() => {}).finally(() => REFRESH[page]?.());
+  }
+
+  navItems.forEach(btn => {
+    btn.addEventListener("click", () => {
+      showPage(btn.dataset.page);
+      writeHash(true);
+    });
+  });
+
+  // keep the URL in step with the filters (replace, so Back still means "previous page")
+  ["change", "input"].forEach(evt =>
+    document.addEventListener(evt, e => {
+      if (PAGE_CONTROLS[currentPage].includes(e.target.id)) writeHash(false);
+    })
+  );
+  el("deg-recalib-toggle")?.addEventListener("click", () => writeHash(false));
+
+  window.addEventListener("popstate", applyHash);
+  window.addEventListener("hashchange", applyHash);
+
+  if (location.hash) applyHash();
+})();

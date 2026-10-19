@@ -33,27 +33,35 @@
       <aside class="sidebar" id="sidebar">
        <div class="sidebar-inner">
         <div class="brand">
-          <div class="brand-name">DentCalib</div>
+          <div class="brand-name">
+            <span class="brand-full">DentCalib</span
+            ><span class="brand-mark" aria-hidden="true">DC</span>
+          </div>
           <div class="brand-sub">
             Confidence calibration benchmark for impacted tooth detection
           </div>
         </div>
 
-        <nav class="nav">
-          <button class="nav-item active" data-page="auditor">
-            Live OPG Auditor
+        <nav class="nav" aria-label="Pages">
+          <button class="nav-item active" data-page="auditor" title="Live OPG Auditor">
+            <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><circle cx="12" cy="12" r="3"/></svg>
+            <span class="nav-label">Live OPG Auditor</span>
           </button>
-          <button class="nav-item" data-page="explorer">
-            Benchmark Explorer
+          <button class="nav-item" data-page="explorer" title="Benchmark Explorer">
+            <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>
+            <span class="nav-label">Benchmark Explorer</span>
           </button>
-          <button class="nav-item" data-page="reliability">
-            Reliability Viewer
+          <button class="nav-item" data-page="reliability" title="Reliability Viewer">
+            <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4v16h16"/><path d="M7 17L18 6" stroke-dasharray="2 3"/><path d="M7 16c4 0 5-4 11-9"/></svg>
+            <span class="nav-label">Reliability Viewer</span>
           </button>
-          <button class="nav-item" data-page="degradation">
-            OOD Degradation Curves
+          <button class="nav-item" data-page="degradation" title="OOD Degradation Curves">
+            <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6l6 6 4-4 8 8"/><path d="M21 10v6h-6"/></svg>
+            <span class="nav-label">OOD Degradation Curves</span>
           </button>
-          <button class="nav-item" data-page="pipeline">
-            DentalCalib-Net Pipeline
+          <button class="nav-item" data-page="pipeline" title="DentalCalib-Net Pipeline">
+            <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="9" width="5" height="6" rx="1"/><rect x="16" y="4" width="5" height="5" rx="1"/><rect x="16" y="15" width="5" height="5" rx="1"/><path d="M8 12h3l2-5h3M11 12l2 5h3"/></svg>
+            <span class="nav-label">DentalCalib-Net Pipeline</span>
           </button>
         </nav>
 
@@ -293,7 +301,6 @@
                 <option>mAP@0.50</option>
               </select>
             </label>
-            <button class="btn-primary" id="applyFilters">Apply filters</button>
           </div>
 
           <div class="grid-4 stat-strip">
@@ -502,7 +509,6 @@
                 <button class="toggle-opt" data-mode="dcn">DCN</button>
               </div>
             </label>
-            <button class="btn-primary" id="deg-update">Update chart</button>
           </div>
 
           <div class="deg-chart-wrap">
